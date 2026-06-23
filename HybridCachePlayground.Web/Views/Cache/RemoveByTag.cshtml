@@ -1,0 +1,286 @@
+@model HybridCachePlayground.Web.Models.CacheRemoveByTagRequest
+@{
+    ViewData["Title"] = "Remove by Tag";
+    var allTags = ViewData["AllTags"] as List<string> ?? new();
+
+    // Derive wildcard patterns from known tags: "factory-generated" → "factory-*", "users" → "users*"
+    var wildcardPatterns = allTags
+        .Select(t => t.Contains('-') ? t.Split('-')[0] + "-*" : t + "*")
+        .Distinct()
+        .OrderBy(p => p)
+        .ToList();
+}
+
+<h2 class="mb-4">Remove by Tag</h2>
+<p class="text-muted">
+    Invalidate cache entries by tag using
+    <code>HybridCache.RemoveByTagAsync()</code> — the key feature of tag-based invalidation.
+</p>
+
+<ul class="nav nav-tabs mb-3" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="single-tag-tab" data-bs-toggle="tab" data-bs-target="#single-tag" 
+                type="button" role="tab">
+            <i class="bi bi-tag"></i> Single Tag
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="bulk-tag-tab" data-bs-toggle="tab" data-bs-target="#bulk-tags" 
+                type="button" role="tab">
+            <i class="bi bi-tags"></i> Bulk Tags
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="wildcard-tab" data-bs-toggle="tab" data-bs-target="#wildcard" 
+                type="button" role="tab">
+            <i class="bi bi-asterisk"></i> Wildcard (*)
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+    <!-- Single Tag -->
+    <div class="tab-pane fade show active" id="single-tag" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-md-7">
+                <form asp-action="RemoveByTag" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-3">
+                        <label asp-for="Tag" class="form-label fw-semibold">Tag</label>
+                        <input asp-for="Tag" id="Tag" class="form-control" placeholder="e.g. users" />
+                        <span asp-validation-for="Tag" class="text-danger small"></span>
+                        <div class="form-text">
+                            All entries stored with this exact tag will be logically invalidated.
+                        </div>
+                        @if (allTags.Any())
+                        {
+                            <div class="mt-2">
+                                <small class="text-muted">Known tags: </small>
+                                @foreach (var t in allTags)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-danger chip-suggest"
+                                            data-fill-id="Tag" data-fill-val="@t">@t</button>
+                                }
+                            </div>
+                        }
+                    </div>
+                    <button type="submit" class="btn btn-danger"
+                            data-bs-toggle="tooltip" title="Logically invalidate all entries with this tag">
+                        <i class="bi bi-tag-fill me-1"></i>Invalidate Tag
+                    </button>
+                    <a asp-controller="Home" asp-action="Index" class="btn btn-link"
+                       data-bs-toggle="tooltip" title="Return to the dashboard">
+                        <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+                    </a>
+                </form>
+            </div>
+
+            <div class="col-md-5">
+                <div class="card">
+                    <div class="card-header bg-secondary small">API used</div>
+                    <div class="card-body">
+                        <pre class="small mb-0"><code>await hybridCache.RemoveByTagAsync(tag);</code></pre>
+                    </div>
+                </div>
+                <div class="card border-warning mt-3">
+                    <div class="card-header bg-warning small">Logical Deletion</div>
+                    <div class="card-body small">
+                        <p class="mb-0">
+                            Tag invalidation uses <em>logical deletion</em>. Cache entries remain physically stored 
+                            but are treated as invalid during retrieval, triggering factory re-execution.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Tags -->
+    <div class="tab-pane fade" id="bulk-tags" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-md-7">
+                <form asp-action="BulkRemoveByTag" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-3">
+                        <label for="BulkTags" class="form-label fw-semibold">
+                            Tags to Invalidate
+                            <span class="text-muted fw-normal">(comma or newline-separated)</span>
+                        </label>
+                        <textarea name="Tags" id="BulkTags" class="form-control font-monospace" rows="8"
+                                  placeholder="e.g.&#10;users&#10;products&#10;category:electronics&#10;or&#10;users, products, category:electronics"></textarea>
+                        <div class="form-text">
+                            Enter multiple tags, separated by commas, semicolons, or new lines.
+                            All entries associated with these tags will be logically invalidated.
+                        </div>
+                        @if (allTags.Any())
+                        {
+                            <div class="mt-2">
+                                <small class="text-muted">Known tags (click to add): </small>
+                                @foreach (var t in allTags.Take(20))
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-danger chip-suggest"
+                                            data-append-id="BulkTags" data-append-val="@t">@t</button>
+                                }
+                            </div>
+                        }
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-danger"
+                                data-bs-toggle="tooltip" title="Logically invalidate entries for all specified tags">
+                            <i class="bi bi-tags"></i> Invalidate All Tags
+                        </button>
+                        <a asp-controller="Home" asp-action="Index" class="btn btn-link"
+                           data-bs-toggle="tooltip" title="Return to the dashboard">
+                            <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+                        </a>
+                    </div>
+                </form>
+            </div>
+
+            <div class="col-md-5">
+                <div class="card">
+                    <div class="card-header bg-secondary small">API used</div>
+                    <div class="card-body">
+                        <pre class="small mb-0"><code>await hybridCache.RemoveByTagAsync(
+    IEnumerable&lt;string&gt; tags
+);</code></pre>
+                    </div>
+                </div>
+
+                <div class="card border-warning mt-3">
+                    <div class="card-header bg-warning small">Logical Deletion</div>
+                    <div class="card-body small">
+                        <p class="mb-2">
+                            <strong>Important:</strong> Tag invalidation uses <em>logical deletion</em>, not physical removal.
+                        </p>
+                        <p class="mb-0">
+                            Cache entries remain physically stored but are treated as invalid during retrieval,
+                            triggering factory re-execution in <code>GetOrCreateAsync</code>.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="card border-info mt-3">
+                    <div class="card-header bg-info text-white small">Performance Benefits</div>
+                    <div class="card-body small">
+                        <p class="mb-2">Bulk tag invalidation is more efficient:</p>
+                        <ul class="mb-0 ps-3">
+                            <li>Updates multiple tag timestamps in single L2 operation</li>
+                            <li>Publishes single Pub/Sub notification</li>
+                            <li>Reduces network round-trips</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wildcard -->
+    <div class="tab-pane fade" id="wildcard" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-md-7">
+                <div class="card border-danger">
+                    <div class="card-header bg-danger text-white fw-semibold">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Wildcard Tag Invalidation
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-3">
+                            Wildcard invalidation (<code>*</code>) marks <strong>ALL</strong> cache entries as invalid,
+                            regardless of their tags. Use this with extreme caution in production environments.
+                        </p>
+
+                        <form asp-action="RemoveByTagWildcard" method="post"
+                              onsubmit="return confirm('Invalidate ALL cached entries? This will cause every subsequent cache read to invoke the factory until entries are repopulated.');">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="wildcardPattern" value="*" />
+                            <button type="submit" class="btn btn-danger"
+                                    data-bs-toggle="tooltip" title="Invalidate ALL cache entries system-wide (use with extreme caution)">
+                                <i class="bi bi-radioactive"></i> Invalidate All (<code>*</code>)
+                            </button>
+                        </form>
+
+                        <div class="alert alert-warning mt-3 mb-0 small">
+                            <strong>Warning:</strong> This operation cannot be undone and will impact all cache entries system-wide.
+                        </div>
+                    </div>
+                </div>
+
+                <a asp-controller="Home" asp-action="Index" class="btn btn-link mt-3"
+                   data-bs-toggle="tooltip" title="Return to the dashboard">
+                    <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+                </a>
+            </div>
+
+            <div class="col-md-5">
+                <div class="card">
+                    <div class="card-header bg-secondary small">How it works</div>
+                    <div class="card-body small">
+                        <p class="mb-2">
+                            When wildcard is called, TagKeeper updates the <em>global invalidation timestamp</em>.
+                            All cache entries with timestamps older than this global timestamp are treated as invalid.
+                        </p>
+                        <p class="mb-0">
+                            Cache entries remain physically stored until expiration, but <code>GetOrCreateAsync</code>
+                            will always invoke the factory function for invalidated entries.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="card border-info mt-3">
+                    <div class="card-header bg-info text-white small">Use Cases</div>
+                    <div class="card-body small">
+                        <ul class="mb-0 ps-3">
+                            <li>Application-wide configuration changes</li>
+                            <li>Schema migrations or data model updates</li>
+                            <li>Emergency cache flush scenarios</li>
+                            <li>Testing and development environments</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="card border-warning mt-3">
+                    <div class="card-header bg-warning small">Note</div>
+                    <div class="card-body small">
+                        Wildcard can be called multiple times. Each invocation updates the global timestamp,
+                        invalidating all entries again.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+    // ── Initialize Bootstrap tooltips ──────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function () {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+
+    // Single tag suggestion - fill input
+    document.querySelectorAll('[data-fill-id]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.getElementById(btn.getAttribute('data-fill-id')).value = btn.getAttribute('data-fill-val');
+        });
+    });
+
+    // Bulk tags suggestion - append to textarea
+    document.querySelectorAll('[data-append-id]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var textarea = document.getElementById(btn.getAttribute('data-append-id'));
+            var currentVal = textarea.value.trim();
+            var newVal = btn.getAttribute('data-append-val');
+
+            if (currentVal === '') {
+                textarea.value = newVal;
+            } else {
+                textarea.value = currentVal + '\n' + newVal;
+            }
+        });
+    });
+    </script>
+}

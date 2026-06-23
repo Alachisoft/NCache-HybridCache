@@ -1,0 +1,194 @@
+@model HybridCachePlayground.Web.Models.CacheRemoveRequest
+@{
+    ViewData["Title"] = "Remove by Key";
+    var recentKeys = ViewData["RecentKeys"] as List<string> ?? new();
+}
+
+<h2 class="mb-4">Remove by Key</h2>
+<p class="text-muted">
+    Remove cache entries from both L1 and L2 using
+    <code>HybridCache.RemoveAsync()</code>.
+</p>
+
+<ul class="nav nav-tabs mb-3" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="single-tab" data-bs-toggle="tab" data-bs-target="#single-remove" 
+                type="button" role="tab">
+            <i class="bi bi-key"></i> Single Key
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="bulk-tab" data-bs-toggle="tab" data-bs-target="#bulk-remove" 
+                type="button" role="tab">
+            <i class="bi bi-collection"></i> Bulk Keys
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+    <!-- Single Key Remove -->
+    <div class="tab-pane fade show active" id="single-remove" role="tabpanel">
+        <div class="row">
+            <div class="col-md-7">
+                <form asp-action="Remove" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-3">
+                        <label asp-for="Key" class="form-label fw-semibold">Cache Key</label>
+                        <input asp-for="Key" id="Key" class="form-control" placeholder="e.g. user:42" />
+                        <span asp-validation-for="Key" class="text-danger small"></span>
+                        @if (recentKeys.Any())
+                        {
+                            <div class="mt-1">
+                                <small class="text-muted">Recent: </small>
+                                @foreach (var k in recentKeys)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary chip-suggest"
+                                            data-fill-id="Key" data-fill-val="@k">@k</button>
+                                }
+                            </div>
+                        }
+                    </div>
+                    <button type="submit" class="btn btn-danger"
+                            data-bs-toggle="tooltip" title="Remove this entry from both L1 and L2 cache">
+                        <i class="bi bi-trash me-1"></i>Remove Entry
+                    </button>
+                    <a asp-controller="Home" asp-action="Index" class="btn btn-link"
+                       data-bs-toggle="tooltip" title="Return to the dashboard">
+                        <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+                    </a>
+                </form>
+            </div>
+
+            <div class="col-md-5">
+                <div class="card">
+                    <div class="card-header bg-secondary small">API used</div>
+                    <div class="card-body">
+                        <pre class="small mb-0"><code>await hybridCache.RemoveAsync(key);</code></pre>
+                    </div>
+                </div>
+                <div class="card border-warning mt-3">
+                    <div class="card-header bg-warning small">Note</div>
+                    <div class="card-body small">
+                        <code>RemoveAsync</code> evicts from <strong>both</strong> L1 (in-process)
+                        and L2 (distributed). On multi-server setups, all nodes are invalidated
+                        when using a distributed L2 backend.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Keys Remove -->
+    <div class="tab-pane fade" id="bulk-remove" role="tabpanel">
+        <div class="row">
+            <div class="col-md-7">
+                <form asp-action="BulkRemove" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-3">
+                        <label for="BulkKeys" class="form-label fw-semibold">
+                            Cache Keys
+                            <span class="text-muted fw-normal">(comma or newline-separated)</span>
+                        </label>
+                        <textarea name="Keys" id="BulkKeys" class="form-control font-monospace" rows="8"
+                                  placeholder="e.g.&#10;user:1&#10;user:2&#10;product:100&#10;or&#10;user:1, user:2, product:100"></textarea>
+                        <div class="form-text">
+                            Enter multiple cache keys, separated by commas, semicolons, or new lines.
+                            All matching entries will be removed from both L1 and L2 caches.
+                        </div>
+                        @if (recentKeys.Any())
+                        {
+                            <div class="mt-2">
+                                <small class="text-muted">Recent keys (click to add): </small>
+                                @foreach (var k in recentKeys.Take(20))
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary chip-suggest"
+                                            data-append-id="BulkKeys" data-append-val="@k">@k</button>
+                                }
+                            </div>
+                        }
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-danger"
+                                data-bs-toggle="tooltip" title="Remove all specified entries from both L1 and L2 cache">
+                            <i class="bi bi-trash"></i> Remove All Keys
+                        </button>
+                        <a asp-controller="Home" asp-action="Index" class="btn btn-link"
+                           data-bs-toggle="tooltip" title="Return to the dashboard">
+                            <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+                        </a>
+                    </div>
+                </form>
+            </div>
+
+            <div class="col-md-5">
+                <div class="card">
+                    <div class="card-header bg-secondary small">API used</div>
+                    <div class="card-body">
+                        <pre class="small mb-0"><code>await hybridCache.RemoveAsync(
+    IEnumerable&lt;string&gt; keys
+);</code></pre>
+                    </div>
+                </div>
+                <div class="card border-warning mt-3">
+                    <div class="card-header bg-warning small">Note</div>
+                    <div class="card-body small">
+                        <p class="mb-2">
+                            <code>RemoveAsync</code> with multiple keys performs a <strong>bulk removal</strong>
+                            operation, removing all specified entries from both L1 (in-process) and L2 (distributed) caches.
+                        </p>
+                        <p class="mb-0">
+                            On multi-server setups, all nodes are notified via Pub/Sub to remove these keys
+                            from their local caches, ensuring cache consistency across the cluster.
+                        </p>
+                    </div>
+                </div>
+                <div class="card border-info mt-3">
+                    <div class="card-header bg-info text-white small">Performance</div>
+                    <div class="card-body small">
+                        Bulk operations are more efficient than individual removals as they:
+                        <ul class="mb-0 ps-3">
+                            <li>Use a single L2 cache operation</li>
+                            <li>Publish a single Pub/Sub notification</li>
+                            <li>Reduce network round-trips</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+    // ── Initialize Bootstrap tooltips ──────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function () {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+
+    // Single key suggestion - fill input
+    document.querySelectorAll('[data-fill-id]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.getElementById(btn.getAttribute('data-fill-id')).value = btn.getAttribute('data-fill-val');
+        });
+    });
+
+    // Bulk keys suggestion - append to textarea
+    document.querySelectorAll('[data-append-id]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var textarea = document.getElementById(btn.getAttribute('data-append-id'));
+            var currentVal = textarea.value.trim();
+            var newVal = btn.getAttribute('data-append-val');
+
+            if (currentVal === '') {
+                textarea.value = newVal;
+            } else {
+                textarea.value = currentVal + '\n' + newVal;
+            }
+        });
+    });
+    </script>
+}

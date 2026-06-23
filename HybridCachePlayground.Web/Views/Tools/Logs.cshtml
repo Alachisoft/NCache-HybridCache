@@ -1,0 +1,160 @@
+@{
+    ViewData["Title"] = "Session Log";
+    var logFilePath = ViewData["LogFilePath"] as string ?? "(unknown)";
+}
+
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <div>
+        <h2 class="mb-0"><i class="bi bi-terminal me-2"></i>Session Log</h2>
+        <small class="text-muted font-monospace">@logFilePath</small>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <label class="form-check-label small text-muted me-1" for="chkAutoScroll">Auto-scroll</label>
+        <input class="form-check-input" type="checkbox" id="chkAutoScroll" checked />
+        <label class="form-check-label small text-muted ms-2 me-1" for="chkAutoRefresh">Live</label>
+        <input class="form-check-input" type="checkbox" id="chkAutoRefresh" checked />
+        <button id="btnClear" class="btn btn-sm btn-outline-secondary ms-2"
+                data-bs-toggle="tooltip" title="Clear log viewer (does not delete log file)">
+            <i class="bi bi-eraser"></i> Clear view
+        </button>
+        <a href="@Url.Action("ExportSnapshot", "Tools")" class="btn btn-sm btn-outline-success"
+           data-bs-toggle="tooltip" title="Download current cache state as JSON">
+            <i class="bi bi-download me-1"></i>Snapshot
+        </a>
+        <a asp-controller="Home" asp-action="Index" class="btn btn-sm btn-outline-secondary"
+           data-bs-toggle="tooltip" title="Return to the main dashboard">
+            <i class="bi bi-arrow-left me-1"></i>Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Level filter pills -->
+<div class="mb-3 d-flex gap-2 flex-wrap" id="levelFilters">
+    <button class="btn btn-sm btn-filter active" data-level="all">All</button>
+    <button class="btn btn-sm btn-filter-dbg"   data-level="dbg">DBG</button>
+    <button class="btn btn-sm btn-filter-inf"   data-level="inf">INF</button>
+    <button class="btn btn-sm btn-filter-wrn"   data-level="wrn">WRN</button>
+    <button class="btn btn-sm btn-filter-err"   data-level="err">ERR / FTL</button>
+</div>
+
+<div id="logContainer" class="log-viewer font-monospace small" style="
+    background:#0d1117; border:1px solid #30363d; border-radius:6px;
+    padding:12px; height:60vh; overflow-y:auto; white-space:pre; overflow-x:auto;">
+    <span class="text-muted">Connecting…</span>
+</div>
+
+<div class="mt-2 d-flex gap-3 small text-muted">
+    <span id="lineCount">0 lines</span>
+    <span id="lastUpdated"></span>
+</div>
+
+@section Scripts {
+<script>
+// ── Initialize Bootstrap tooltips ──────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+
+var allLines      = [];
+var seenTotal     = 0;
+var activeFilter  = 'all';
+var refreshTimer  = null;
+
+var LEVEL_CLASS = {
+    dbg: 'log-dbg', inf: 'log-inf', wrn: 'log-wrn', err: 'log-err', ftl: 'log-err'
+};
+
+function classifyLine(line) {
+    var m = line.match(/\[(DBG|INF|WRN|ERR|FTL)\]/i);
+    if (!m) return '';
+    return LEVEL_CLASS[m[1].toLowerCase()] || '';
+}
+
+function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderLines() {
+    var container = document.getElementById('logContainer');
+    var filtered  = allLines.filter(function(l) {
+        if (activeFilter === 'all') return true;
+        var m = l.match(/\[(DBG|INF|WRN|ERR|FTL)\]/i);
+        if (!m) return activeFilter === 'all';
+        var lvl = m[1].toLowerCase();
+        if (activeFilter === 'err') return lvl === 'err' || lvl === 'ftl';
+        return lvl === activeFilter;
+    });
+
+    container.innerHTML = filtered.map(function(l) {
+        var cls = classifyLine(l);
+        return '<span class="' + cls + '">' + escHtml(l) + '</span>';
+    }).join('\n') || '<span class="text-muted">No lines match the filter.</span>';
+
+    document.getElementById('lineCount').textContent = allLines.length + ' lines';
+    document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+
+    if (document.getElementById('chkAutoScroll').checked)
+        container.scrollTop = container.scrollHeight;
+}
+
+async function poll() {
+    try {
+        var resp = await fetch('@Url.Action("LogContent", "Tools")?skip=' + seenTotal);
+        var data = await resp.json();
+        if (data.lines && data.lines.length) {
+            allLines = allLines.concat(data.lines);
+            seenTotal = data.total;
+            renderLines();
+        }
+    } catch(e) { console.error('Log poll error', e); }
+}
+
+function startRefresh() {
+    if (refreshTimer) return;
+    refreshTimer = setInterval(function() {
+        if (document.getElementById('chkAutoRefresh').checked) poll();
+    }, 2000);
+}
+
+document.getElementById('chkAutoRefresh').addEventListener('change', function() {
+    if (this.checked) startRefresh(); else { clearInterval(refreshTimer); refreshTimer = null; }
+});
+
+document.getElementById('btnClear').addEventListener('click', function() {
+    allLines  = [];
+    seenTotal = 0;
+    document.getElementById('logContainer').innerHTML = '<span class="text-muted">Cleared — next poll will reload.</span>';
+    document.getElementById('lineCount').textContent = '0 lines';
+});
+
+// Level filter buttons
+document.getElementById('levelFilters').addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-level]');
+    if (!btn) return;
+    document.querySelectorAll('[data-level]').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    activeFilter = btn.getAttribute('data-level');
+    renderLines();
+});
+
+poll();         // initial load
+startRefresh(); // begin polling
+</script>
+
+<style>
+.log-dbg { color: #6e7681; }
+.log-inf { color: #79c0ff; }
+.log-wrn { color: #e3b341; }
+.log-err { color: #f85149; }
+
+[data-level].active { outline: 2px solid currentColor; }
+.btn-filter      { color:#adb5bd; border-color:#6c757d; }
+.btn-filter-dbg  { color:#6e7681; border-color:#6e7681; }
+.btn-filter-inf  { color:#79c0ff; border-color:#79c0ff; }
+.btn-filter-wrn  { color:#e3b341; border-color:#e3b341; }
+.btn-filter-err  { color:#f85149; border-color:#f85149; }
+</style>
+}
