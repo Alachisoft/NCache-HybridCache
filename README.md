@@ -509,7 +509,6 @@ var options = new HybridCacheEntryOptions
 }
 ```
 
-## Implementation Details
 
 ### Key Optimizations
 
