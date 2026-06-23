@@ -417,7 +417,6 @@ await _cache.RemoveByTagAsync(new[] { "products", "users", "orders" });
    - **Cross-node sync**: All nodes update local `_tagInvalidationTimes` from L2 sentinels
    - **Physical storage**: Cache entries remain in L1/L2, marked invalid only via timestamps
 
-## Best Practices
 
 ### Bulk Operations Efficiency
 
