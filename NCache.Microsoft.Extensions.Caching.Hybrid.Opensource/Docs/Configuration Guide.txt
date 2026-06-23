@@ -1,0 +1,303 @@
+========================================
+NCache HybridCache Configuration Guide
+========================================
+
+Package: NCache.OSS.Microsoft.Extensions.Caching.Hybrid
+Version: 5.3.6.1
+
+The NCache HybridCache integration requires configuration for two cache instances:
+    - L1 Cache: In-Proc local cache (fast, per-instance)
+    - L2 Cache: Replicated/Partitioned distributed cache (shared across instances)
+
+Configuration can be provided via:
+    - appsettings.json (IConfiguration binding)
+    - Action delegate in Program.cs
+    - Hybrid approach (base in appsettings, overrides in code)
+
+Configuration Section Name: "NCacheHybridCache"
+    - Used for auto-detection when using AddNCacheHybridCache(IConfiguration)
+
+
+--------------------------------------------------------------------------------
+Example 1: Using appsettings.json (Recommended for Production)
+--------------------------------------------------------------------------------
+
+This is the recommended approach for production deployments as it allows 
+configuration changes without recompilation.
+
+File: appsettings.json
+    ┌───────────────────────────────────────────────────────────┐
+    │	{                                                       │
+    │	  "NCacheHybridCache": {                                │
+    │	    "LocalCacheName": "myLocalCache",                   │
+    │	    "LocalCacheExpiration": "00:05:00",                 │
+    │	    "DistributedCacheName": "myDistributedCache",       │
+    │	    "DistributedCacheExpiration": "00:30:00",           │
+    │	    "ServerList": [                                     │
+    │	      {                                                 │
+    │	        "Ip": "192.168.1.100",                          │
+    │	        "Port": 9800                                    │
+    │	      },                                                │
+    │	      {                                                 │
+    │	        "Ip": "192.168.1.101",                          │
+    │	        "Port": 9800                                    │
+    │	      }                                                 │
+    │	    ]                                                   │
+    │	  }                                                     │
+    │	}                                                       │
+    └───────────────────────────────────────────────────────────┘
+
+File: Program.cs
+    ┌──────────────────────────────────────────────────────────────────────────────────────┐
+    │	var builder = WebApplication.CreateBuilder(args);                                  │
+    │	                                                                                   │
+    │	// Method 1: Using specific configuration section                                  │
+    │	var config = builder.Configuration.GetSection("NCacheHybridCacheConfiguration");   │
+    │	builder.Services.AddNCacheHybridCache(config);                                     │
+    │	                                                                                   │
+    │	// OR Method 2: Auto-detect configuration section                                  │
+    │	builder.Services.AddNCacheHybridCache(builder.Configuration);                      │
+    │	                                                                                   │
+    │	var app = builder.Build();                                                         │
+    │	app.Run();                                                                         │
+    └──────────────────────────────────────────────────────────────────────────────────────┘
+
+
+--------------------------------------------------------------------------------
+Example 2: Using Action Delegate in Program.cs
+--------------------------------------------------------------------------------
+
+Useful for development/testing or when configuration is computed at runtime.
+
+File: Program.cs
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │	var builder = WebApplication.CreateBuilder(args);                     │
+    │	                                                                      │
+    │	builder.Services.AddNCacheHybridCache(options =>                      │
+    │	{                                                                     │
+    │	    options.LocalCacheName = "myLocalCache";                          │
+    │	    options.LocalCacheExpiration = TimeSpan.FromMinutes(5);           │
+    │	    options.DistributedCacheName = "myDistributedCache";              │
+    │	    options.DistributedCacheExpiration = TimeSpan.FromMinutes(30);    │
+    │	    options.ServerList = new List<ServerConfig>                       │
+    │	    {                                                                 │
+    │	        new ServerConfig { Ip = "192.168.1.100", Port = 9800 },       │
+    │	        new ServerConfig { Ip = "192.168.1.101", Port = 9800 }        │
+    │	    };                                                                │
+    │	});                                                                   │
+    │	var app = builder.Build();                                            │
+    │	app.Run();                                                            │
+    └─────────────────────────────────────────────────────────────────────────┘
+
+
+--------------------------------------------------------------------------------
+Example 3: Development Environment
+--------------------------------------------------------------------------------
+
+File: appsettings.Development.json
+    ┌────────────────────────────────────────────────────────────────────────────┐
+    │	{                                                                        │
+    │	  "NCacheHybridCacheConfiguration": {                                    │
+    │	    "LocalCacheName": "dev-local-cache",                                 │
+    │	    "LocalCacheExpiration": "00:02:00",                                  │
+    │	    "DistributedCacheName": "dev-distributed-cache",                     │
+    │	    "DistributedCacheExpiration": "00:10:00",                            │
+    │	    "ServerList": [                                                      │
+    │	      {                                                                  │
+    │	        "Ip": "127.0.0.1",                                               │
+    │	        "Port": 9800                                                     │
+    │	      }                                                                  │
+    │	    ]                                                                    │
+    │	  },                                                                     │
+    │	  "Logging": {                                                           │
+    │	    "LogLevel": {                                                        │
+    │	      "Default": "Information",                                          │
+    │	      "NCache.Microsoft.Extensions.Caching.Hybrid.Opensource": "Debug"   │
+    │	    }                                                                    │
+    │	  }                                                                      │
+    │	}                                                                        │
+    └────────────────────────────────────────────────────────────────────────────┘
+
+
+--------------------------------------------------------------------------------
+Example 4: Production Environment (Multi-Server Cluster)
+--------------------------------------------------------------------------------
+
+File: appsettings.Production.json
+    ┌──────────────────────────────────────────────────────────────────────────────────┐
+    │	{                                                                              │
+    │	  "NCacheHybridCacheConfiguration": {                                          │
+    │	    "LocalCacheName": "prod-api-local",                                        │
+    │	    "LocalCacheExpiration": "00:05:00",                                        │
+    │	    "DistributedCacheName": "prod-api-distributed",                            │
+    │	    "DistributedCacheExpiration": "01:00:00",                                  │
+    │	    "ServerList": [                                                            │
+    │	      {                                                                        │
+    │	        "Ip": "10.0.1.100",                                                    │
+    │	        "Port": 9800                                                           │
+    │	      },                                                                       │
+    │	      {                                                                        │
+    │	        "Ip": "10.0.1.101",                                                    │
+    │	        "Port": 9800                                                           │
+    │	      },                                                                       │
+    │	      {                                                                        │
+    │	        "Ip": "10.0.1.102",                                                    │
+    │	        "Port": 9800                                                           │
+    │	      }                                                                        │
+    │	    ]                                                                          │
+    │	  },                                                                           │
+    │	  "Logging": {                                                                 │
+    │	    "LogLevel": {                                                              │
+    │	      "Default": "Warning",                                                    │
+    │	      "NCache.Microsoft.Extensions.Caching.Hybrid.Opensource": "Information"   │
+    │	    }                                                                          │
+    │	  }                                                                            │
+    │	}                                                                              │
+    └──────────────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+CONFIGURATION PROPERTIES
+================================================================================
+
+Class: NCacheHybridCacheOptions
+Namespace: NCache.OSS.Microsoft.Extensions.Caching.Hybrid
+
+Properties:
+------------
+
+1. LocalCacheName (string?, Required)
+   Name of the NCache In-Proc cache used as local cache (L1). Must be created 
+   in NCache before application startup. Runs in application process memory for 
+   fast access (microseconds).
+
+   Example: "myAppLocalCache", "prod-api-l1-cache"
+   Error if invalid: "LocalCacheName is required."
+
+
+2. LocalCacheExpiration (TimeSpan?, Optional, Default: null)
+   Duration for which items are retained in the local cache before expiration. 
+   If null, local caching is disabled. Should typically be shorter than 
+   DistributedCacheExpiration to balance performance and data freshness.
+
+   Example: TimeSpan.FromMinutes(5), "00:05:00" (JSON format)
+
+
+3. DistributedCacheName (string?, Required)
+   Name of the NCache distributed cache used as distributed cache (L2). Must be 
+   created in NCache before application startup. Shared across all application 
+   instances for data consistency.
+
+   Example: "myAppDistributedCache", "prod-api-l2-cache"
+   Error if invalid: "DistributedCacheName is required."
+
+
+4. DistributedCacheExpiration (TimeSpan?, Optional, Default: null)
+   Expiration time for items stored in the distributed cache. If null, uses 
+   distributed cache provider's default expiration. Should typically be longer 
+   than LocalCacheExpiration.
+
+   Example: TimeSpan.FromMinutes(30), "00:30:00" (JSON format)
+
+
+5. ServerList (IList<ServerConfig>, Required)
+   List of NCache server configurations defining the L2 cache cluster nodes. 
+   Each entry specifies IP address and port. Must contain at least one server.
+
+   Example: new List<ServerConfig> { new ServerConfig { Ip = "192.168.1.100", Port = 9800 } }
+   Error if invalid: "At least one server configuration is required."
+
+
+ServerConfig Properties:
+-------------------------
+
+Class: ServerConfig (record)
+
+1. Ip (string, Required, Default: string.Empty)
+   The IP address of the NCache server node. Must be valid IPv4 or IPv6 format.
+
+   Example: "192.168.1.100", "127.0.0.1", "::1" (IPv6)
+   Error if invalid: "IP address '{Ip}' is invalid."
+
+
+2. Port (int, Optional, Default: 9800)
+   The network port number used for connections to the NCache server. Must be 
+   between 1 and 65535.
+
+   Example: 9800 (default NCache port)
+   Error if invalid: "Port number '{Port}' must be between 1 and 65535."
+
+
+================================================================================
+VALIDATION RULES
+================================================================================
+
+Configuration validation occurs in the NCacheHybridCache constructor. If 
+validation fails, an InvalidOperationException is thrown with a descriptive 
+error message.
+
+Validation Order:
+1. LocalCacheName validation (not null/empty)
+2. DistributedCacheName validation (not null/empty)
+3. ServerList existence validation (not null/empty, at least one server)
+4. Each ServerConfig validation (valid IP address and port range 1-65535)
+
+Common Validation Error Messages:
+- "LocalCacheName is required."
+- "DistributedCacheName is required."
+- "At least one server configuration is required."
+- "IP address '{Ip}' is invalid."
+- "Port number '{Port}' must be between 1 and 65535."
+
+
+================================================================================
+LOGGING CONFIGURATION
+================================================================================
+
+NCache HybridCache uses the standard ASP.NET Core logging infrastructure via 
+ILogger<NCacheHybridCache>. Logging is controlled through the standard 
+"Logging" configuration section in appsettings.json.
+
+The cache will automatically use the ILogger<NCacheHybridCache> instance 
+injected by the dependency injection container. If no logger is registered, 
+a NullLogger is used to avoid exceptions.
+
+Recommended Logging Levels:
+----------------------------
+
+Development Environment:
+    - Use "Debug" or "Information" level for detailed cache operation insights
+    - Example:
+      ┌─────────────────────────────────────────────────────────────────┐
+      │  "Logging": {                                                   │
+      │    "LogLevel": {                                                │
+      │      "Default": "Information",                                  │
+      │      "NCache.Microsoft.Extensions.Caching.Hybrid": "Debug"      │
+      │    }                                                            │
+      │  }                                                              │
+      └─────────────────────────────────────────────────────────────────┘
+
+Production Environment:
+    - Use "Warning" or "Information" level to minimize log volume
+    - Example:
+      ┌─────────────────────────────────────────────────────────────────┐
+      │  "Logging": {                                                   │
+      │    "LogLevel": {                                                │
+      │      "Default": "Warning",                                      │
+      │      "NCache.Microsoft.Extensions.Caching.Hybrid": "Information"│
+      │    }                                                            │
+      │  }                                                              │
+      └─────────────────────────────────────────────────────────────────┘
+
+Log Categories:
+---------------
+All cache logs are emitted under the category:
+    "NCache.Microsoft.Extensions.Caching.Hybrid.Opensource.NCacheHybridCache"
+
+You can control logging for the entire NCache HybridCache integration by 
+configuring the log level for this category or its parent namespace.
+
+Note: Logging configuration is separate from the NCacheHybridCache 
+configuration. There is no "EnableLogs" flag in the cache configuration 
+itself - logging is controlled entirely through the ASP.NET Core logging 
+infrastructure.

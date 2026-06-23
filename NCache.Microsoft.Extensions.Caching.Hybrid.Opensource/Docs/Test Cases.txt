@@ -1,0 +1,251 @@
+﻿================================
+NCache HybridCache Test Cases
+================================
+
+----------------------------
+1. Initialization Scenarios
+----------------------------
+	1.1 Successful Initialization
+		- INIT-001: Verify cache initializes successfully with valid LocalCacheName, DistributedCacheName, and ServerList configuration → Expected: NCacheHybridCache instance created, no exceptions thrown
+		- INIT-002: Verify cache initializes correctly when configuration is bound from IConfiguration section → Expected: Configuration properties bound correctly, cache operational
+		- INIT-003: Verify cache initializes correctly when configured using Action<NCacheHybridCacheConfiguration> delegate → Expected: Delegate invoked, options applied, cache initialized
+		- INIT-004: Verify HybridCache is registered as singleton and returns same instance on multiple resolutions → Expected: ReferenceEquals returns true for multiple resolutions
+		- INIT-005: Verify Pub/Sub topic is created and subscribed during initialization → Expected: Topic exists in NCache, subscription active
+		- INIT-006: Verify TagKeeper is initialized with distributed cache reference → Expected: TagKeeper._distributedCache is not null
+		- INIT-007: Verify unique identifier is generated using client IP and client ID → Expected: Identifier format matches "{IP}:{ClientId}"
+		- INIT-008: Verify logging is enabled when EnableLogs is true and ILogger provided → Expected: Log entries written to configured sink
+		- INIT-009: Verify NullLogger is used when EnableLogs is false → Expected: No log entries written
+	1.2 Failed Initialization
+		- INIT-010: Verify InvalidOperationException is thrown when LocalCacheName is null → Expected: InvalidOperationException with message "LocalCacheName is required."
+		- INIT-011: Verify InvalidOperationException is thrown when LocalCacheName is empty string → Expected: InvalidOperationException with message "LocalCacheName is required."
+		- INIT-012: Verify InvalidOperationException is thrown when DistributedCacheName is null → Expected: InvalidOperationException with message "DistributedCacheName is required."
+		- INIT-013: Verify InvalidOperationException is thrown when DistributedCacheName is empty string → Expected: InvalidOperationException with message "DistributedCacheName is required."
+		- INIT-014: Verify InvalidOperationException is thrown when ServerList is null → Expected: InvalidOperationException with message "At least one server configuration is required."
+		- INIT-015: Verify InvalidOperationException is thrown when ServerList is empty → Expected: InvalidOperationException with message "At least one server configuration is required."
+		- INIT-016: Verify InvalidOperationException is thrown when ServerList contains null IP → Expected: InvalidOperationException with IP validation error
+		- INIT-017: Verify InvalidOperationException is thrown when ServerList contains empty IP → Expected: InvalidOperationException with IP validation error
+		- INIT-018: Verify InvalidOperationException is thrown when ServerList contains invalid IP format → Expected: InvalidOperationException with IP validation error
+		- INIT-019: Verify InvalidOperationException is thrown when ServerList contains port < 1 → Expected: InvalidOperationException with port validation error
+		- INIT-020: Verify InvalidOperationException is thrown when ServerList contains port > 65535 → Expected: InvalidOperationException with port validation error
+		- INIT-021: Verify InvalidOperationException is thrown when L1 cache name does not exist in NCache → Expected: InvalidOperationException with message containing "Failed to initialize local cache"
+		- INIT-022: Verify InvalidOperationException is thrown when L2 cache servers are unreachable → Expected: InvalidOperationException with message containing "Failed to initialize distributed cache"
+		- INIT-023: Verify ArgumentNullException is thrown when services parameter is null in AddNCacheHybridCache → Expected: ArgumentNullException with ParamName "services"
+		- INIT-024: Verify ArgumentNullException is thrown when configuration Action is null in AddNCacheHybridCache → Expected: ArgumentNullException with ParamName "configuration"
+		- INIT-025: Verify ArgumentNullException is thrown when IConfiguration is null in AddNCacheHybridCache → Expected: ArgumentNullException with ParamName "configuration"
+
+------------------------------
+2. GetOrCreateAsync Scenarios
+------------------------------
+	2.1 L1 Cache Hit Scenarios
+		- GET-001: Verify value is returned from L1 cache when item exists and has no tags → Expected: item.GetValue<T>() returned, factory not invoked, latency < 1ms
+		- GET-002: Verify value is returned from L1 cache when item exists and all tags are valid → Expected: item.GetValue<T>() returned, TagKeeper.IsItemInvalidatedAsync returns false
+		- GET-003: Verify factory is NOT invoked when L1 cache hit occurs → Expected: Factory delegate invocation count = 0
+		- GET-004: Verify L2 cache is NOT accessed when L1 cache hit occurs → Expected: No L2 Get operation logged, isItemInvalid flag not checked
+		- GET-005: Verify correct type is returned when retrieving cached object from L1 → Expected: Returned object type matches expected type T via GetValue<T>()
+	2.2 L2 Cache Hit Scenarios
+		- GET-006: Verify value is returned from L2 cache when L1 misses but L2 hits → Expected: item.GetValue<T>() returned, factory not invoked
+		- GET-007: Verify L1 cache is populated when value is fetched from L2 cache and tags are valid → Expected: Subsequent L1 Get returns the value
+		- GET-008: Verify factory is NOT invoked when L2 cache hit occurs and tags are valid → Expected: Factory delegate invocation count = 0
+		- GET-009: Verify L1 is populated with LocalCacheExpiration from options or config on L2 hit → Expected: L1 item has options.LocalCacheExpiration or config.LocalCacheExpiration applied
+		- GET-010: Verify L1 population is skipped when DisableLocalCache flag is set on L2 hit → Expected: L1 Get returns null after L2 hit
+		- GET-011: Verify L2 read is performed even when L1 item is tag-invalidated → Expected: L2 Get IS called (L2 may have fresher version), factory only invoked if L2 miss or L2 also invalid
+	2.3 Cache Miss Scenarios
+		- GET-012: Verify factory is invoked when item does not exist in L1 or L2 → Expected: Factory delegate invocation count = 1, cancellationToken passed
+		- GET-013: Verify factory result is stored in L2 cache first after cache miss → Expected: L2 Get returns factory result with options.Expiration or config default
+		- GET-014: Verify factory result is stored in L1 cache after L2 population → Expected: L1 Get returns factory result with options.LocalCacheExpiration or config default
+		- GET-015: Verify factory state parameter is correctly passed to factory function → Expected: State value accessible inside factory(state, cancellationToken)
+		- GET-016: Verify complex objects are correctly serialized and stored in cache → Expected: Deserialized object properties match original
+		- GET-017: Verify null values returned by factory are cached correctly → Expected: Subsequent Get returns null without invoking factory
+		- GET-018: Verify cache item is created with current Unix timestamp → Expected: NCacheHybridCacheItem.CreatedTimeStamp ≈ DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+		- GET-019: Verify cache item stores associated tags → Expected: NCacheHybridCacheItem.Tags contains all provided tags
+		- GET-020: Verify L2 and L1 population use separate expiration configurations → Expected: L2 has Expiration, L1 has LocalCacheExpiration
+	2.4 Tag Invalidation During Get
+		- GET-021: Verify L1 cached item is considered stale when its tag has been invalidated after item creation → Expected: isItemInvalid=true, factory invoked, fresh value returned
+		- GET-022: Verify L2 cached item is considered stale when its tag has been invalidated after item creation → Expected: isItemInvalid=true (if L1 hit with invalid tags), factory invoked
+		- GET-023: Verify item is invalidated when any one of its multiple tags is invalidated → Expected: IsItemInvalidatedAsync returns true
+		- GET-024: Verify item is NOT invalidated when unrelated tag is invalidated → Expected: IsItemInvalidatedAsync returns false, cached value returned
+		- GET-025: Verify all items are invalidated when wildcard (*) tag invalidation occurs → Expected: All GetOrCreateAsync calls invoke factory
+		- GET-026: Verify item created AFTER tag invalidation is NOT considered stale → Expected: Cached value returned, factory not invoked
+		- GET-027: Verify item created BEFORE global wildcard invalidation is considered stale → Expected: Factory invoked
+		- GET-028: Verify item created AFTER global wildcard invalidation is NOT considered stale → Expected: Cached value returned
+		- GET-029: Verify L2 is checked for fresher version even when L1 item is tag-invalidated → Expected: L2 accessed to check for newer timestamp before falling back to factory
+	2.5 Cache Flags Scenarios
+		- GET-030: Verify L1 cache read is skipped when DisableLocalCacheRead flag is set → Expected: L2 accessed even if L1 has value
+		- GET-031: Verify L2 cache read is skipped when DisableDistributedCacheRead flag is set → Expected: Factory invoked even if L2 has value
+		- GET-032: Verify L1 cache write is skipped when DisableLocalCacheWrite flag is set → Expected: L1 Get returns null after GetOrCreateAsync
+		- GET-033: Verify L2 cache write is skipped when DisableDistributedCacheWrite flag is set → Expected: L2 Get returns null after GetOrCreateAsync
+		- GET-034: Verify both L1 read and write are skipped when DisableLocalCache flag is set → Expected: L1 never accessed
+		- GET-035: Verify both L2 read and write are skipped when DisableDistributedCache flag is set → Expected: L2 never accessed
+		- GET-036: Verify all disable flags together causes factory invocation with no caching → Expected: Factory invoked, both caches empty
+		- GET-037: Verify DisableUnderlyingData flag returns default(T) when key is null → Expected: default(T) returned, factory not invoked
+		- GET-038: Verify null key without DisableUnderlyingData flag invokes factory → Expected: Factory invoked, result returned, no caching performed
+	2.6 Expiration Scenarios
+		- GET-039: Verify L2 cache item has Expiration applied from HybridCacheEntryOptions.Expiration → Expected: L2 CacheItem.Expiration.Type = Absolute, Duration = options.Expiration
+		- GET-040: Verify L2 cache item has default Expiration from config when options.Expiration is null → Expected: L2 CacheItem.Expiration = config.DefaultEntryOptions.Expiration
+		- GET-041: Verify L1 cache item has LocalCacheExpiration applied from HybridCacheEntryOptions.LocalCacheExpiration → Expected: L1 CacheItem.Expiration.Type = Absolute, Duration = options.LocalCacheExpiration
+		- GET-042: Verify L1 cache item has default LocalCacheExpiration from config when options.LocalCacheExpiration is null → Expected: L1 CacheItem.Expiration = config.LocalCacheExpiration
+		- GET-043: Verify L1 expires before L2 when LocalCacheExpiration < Expiration → Expected: L1 miss, L2 hit after LocalCacheExpiration elapsed
+		- GET-044: Verify item is re-fetched from L2 after L1 expiration → Expected: L1 repopulated from L2 with LocalCacheExpiration
+		- GET-045: Verify factory is invoked after both L1 and L2 items expire → Expected: Factory invoked, fresh value cached in L2 then L1
+		- GET-046: Verify expiration precedence: options.Expiration overrides config default for L2 → Expected: L2 uses options value, not config
+		- GET-047: Verify expiration precedence: options.LocalCacheExpiration overrides config default for L1 → Expected: L1 uses options value, not config
+	2.7 Cache Stampede Prevention
+		- GET-048: Verify semaphore lock prevents multiple concurrent factory invocations for same key → Expected: Factory invocation count = 1 for N concurrent requests
+		- GET-049: Verify subsequent requests wait for first factory to complete and use cached result → Expected: All N requests return same value via item.GetValue<T>()
+		- GET-050: Verify semaphore WaitAsync accepts cancellationToken parameter → Expected: await lock.WaitAsync(cancellationToken) called
+		- GET-051: Verify semaphore is released in TRY-FINALLY block after factory completes successfully → Expected: _reqLocks.TryRemove(key, out _) in finally, no deadlock
+		- GET-052: Verify semaphore is released in TRY-FINALLY block after factory throws exception → Expected: _reqLocks.TryRemove(key, out _) in finally, exception propagated
+		- GET-053: Verify different keys can be processed concurrently without blocking each other → Expected: Concurrent GetOrCreateAsync for different keys complete independently
+		- GET-054: Verify L1 is re-checked after acquiring semaphore lock (double-check pattern) → Expected: Second request uses item.GetValue<T>() from L1 populated by first request
+	2.8 Error Scenarios
+		- GET-055: Verify null key with DisableUnderlyingData flag returns default(T) → Expected: default(T) returned, no exception
+		- GET-056: Verify null key without DisableUnderlyingData flag invokes factory and returns result → Expected: Factory result returned, no caching, no exception
+		- GET-057: Verify empty key is treated same as null key → Expected: Same behavior as null key (factory or default(T))
+		- GET-058: Verify factory exception propagates to caller unchanged → Expected: Same exception type and message thrown to caller
+		- GET-059: Verify InvalidCastException is thrown when retrieving item with mismatched type → Expected: InvalidCastException from GetValue<T>() with type mismatch
+		- GET-060: Verify OperationCanceledException is thrown when cancellation token is triggered before factory completes → Expected: OperationCanceledException from factory(state, cancellationToken)
+		- GET-061: Verify OperationCanceledException is thrown when cancellation token is triggered during semaphore wait → Expected: OperationCanceledException from lock.WaitAsync(cancellationToken)
+		- GET-062: Verify partial cache state is not corrupted when factory throws exception → Expected: Caches remain in pre-call state, semaphore released in finally
+		- GET-063: Verify semaphore cleanup occurs even when exception thrown → Expected: _reqLocks.TryRemove called in finally block
+
+----------------------
+3. SetAsync Scenarios
+----------------------
+	3.1 Successful Set Operations
+		- SET-001: Verify item is stored in L2 cache first on SetAsync → Expected: _distributedCache.Insert called before _memoryCache.Insert
+		- SET-002: Verify item is stored in L1 cache after L2 on SetAsync → Expected: _memoryCache.Get(key) returns value
+		- SET-003: Verify existing item is updated in L2 cache → Expected: _distributedCache.Get(key) returns new value
+		- SET-004: Verify existing item is updated in L1 cache → Expected: _memoryCache.Get(key) returns new value
+		- SET-005: Verify item is stored with associated tags → Expected: NCacheHybridCacheItem.Tags contains provided tags
+		- SET-006: Verify item is stored with L2 expiration from options.Expiration → Expected: L2 CacheItem.Expiration matches options.Expiration or config default
+		- SET-007: Verify item is stored with L1 expiration from options.LocalCacheExpiration → Expected: L1 CacheItem.Expiration matches options.LocalCacheExpiration or config default
+		- SET-008: Verify Pub/Sub UPDATE message is published after L2 write → Expected: Message with Type=Update published to topic after _distributedCache.Insert
+		- SET-009: Verify NCacheHybridCacheItem.CreatedTimeStamp is set to current time → Expected: Timestamp ≈ DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+	3.2 Set with Flags
+		- SET-010: Verify L1 cache write is skipped when DisableLocalCacheWrite flag is set → Expected: _memoryCache.Get(key) returns null
+		- SET-011: Verify L2 cache write is skipped when DisableDistributedCacheWrite flag is set → Expected: _distributedCache.Get(key) returns null
+		- SET-012: Verify Pub/Sub message is still published when DisableLocalCacheWrite is set → Expected: UPDATE message published
+	3.3 Error Scenarios
+		- SET-013: Verify ArgumentNullException is thrown when key is null → Expected: ArgumentNullException with ParamName "key", message "Value cannot be null. (Parameter 'key')"
+		- SET-014: Verify ArgumentNullException is thrown when key is empty string → Expected: ArgumentNullException with ParamName "key"
+		- SET-015: Verify ArgumentNullException is thrown when value is null → Expected: ArgumentNullException with ParamName "value", message "Value cannot be null. (Parameter 'value')"
+		- SET-016: Verify operation completes even if Pub/Sub publish fails → Expected: Value cached in L2 and L1, error logged, no exception thrown
+
+-------------------------
+4. RemoveAsync Scenarios
+-------------------------
+	4.1 Successful Remove Operations
+		- REM-001: Verify item is removed from L1 cache first on RemoveAsync → Expected: _memoryCache.Remove(key) called
+		- REM-002: Verify item is removed from L2 cache after L1 on RemoveAsync → Expected: _distributedCache.Remove(key) called after L1 removal
+		- REM-003: Verify Pub/Sub REMOVE message is published after RemoveAsync → Expected: Message with Type=Remove, Entity=key published to topic
+		- REM-004: Verify RemoveAsync completes successfully when key does not exist in L1 → Expected: No exception thrown, L2 still checked
+		- REM-005: Verify RemoveAsync completes successfully when key does not exist in L2 → Expected: No exception thrown, pub/sub notification sent
+		- REM-006: Verify RemoveAsync completes successfully when key does not exist in either cache → Expected: No exception thrown, operations complete normally
+		- REM-007: Verify bulk RemoveAsync removes all keys from L1 → Expected: _memoryCache.RemoveBulk(keys) called with all keys
+		- REM-008: Verify bulk RemoveAsync removes all keys from L2 → Expected: _distributedCache.RemoveBulk(keys) called with all keys
+		- REM-009: Verify bulk RemoveAsync publishes single message with all keys → Expected: Single Pub/Sub message with Entity containing all keys
+	4.2 Error Scenarios
+		- REM-010: Verify RemoveAsync returns early when key is null → Expected: No cache operations performed, no exception thrown
+		- REM-011: Verify RemoveAsync returns early when key is empty string → Expected: No cache operations performed, no exception thrown
+		- REM-012: Verify bulk RemoveAsync returns early when keys collection is null → Expected: No cache operations performed, no exception thrown
+		- REM-013: Verify bulk RemoveAsync returns early when keys collection is empty → Expected: No cache operations performed, no exception thrown
+
+------------------------------
+5. RemoveByTagAsync Scenarios
+------------------------------
+	5.1 Tag Invalidation (Logical Deletion)
+		- TAG-001: Verify tag invalidation timestamp is recorded in TagKeeper._tagInvalidationTimes → Expected: Dictionary contains tag with DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+		- TAG-002: Verify tag sentinel value is stored in L2 cache with key "$$sentinel$$:{tag}" → Expected: _distributedCache.Get("$$sentinel$$:{tag}") returns timestamp (long)
+		- TAG-003: Verify Pub/Sub TAG message is published after tag invalidation → Expected: Message with Type=Tag, Entity={tag} published
+		- TAG-004: Verify items with invalidated tag are considered stale on subsequent GetOrCreateAsync → Expected: IsItemInvalidatedAsync returns true, factory invoked
+		- TAG-005: Verify items without the invalidated tag remain valid → Expected: IsItemInvalidatedAsync returns false, cached value returned via GetValue<T>()
+		- TAG-006: Verify multiple calls to RemoveByTagAsync for same tag update timestamp → Expected: Latest timestamp stored, previous timestamp overwritten
+		- TAG-007: Verify tag sentinel has no explicit expiration set → Expected: Sentinel persists until cache expiration or manual removal
+		- TAG-008: Verify logical deletion does NOT physically remove cache items → Expected: Cache items remain in L1/L2, only marked invalid via timestamp
+		- TAG-009: Verify bulk RemoveByTagAsync processes multiple tags → Expected: Each tag gets sentinel, _tagInvalidationTimes updated for all
+		- TAG-010: Verify bulk RemoveByTagAsync publishes single TAG message with all tags → Expected: Single Pub/Sub message with Entity containing all tags
+	5.2 Wildcard Invalidation (Global Logical Deletion)
+		- TAG-011: Verify wildcard (*) invalidation sets _globalInvalidationTimestamp → Expected: _globalInvalidationTimestamp.Result = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+		- TAG-012: Verify wildcard invalidation clears all entries in _tagInvalidationTimes → Expected: _tagInvalidationTimes.Clear() called, Count = 0
+		- TAG-013: Verify wildcard sentinel is stored in L2 with key "$$sentinel$$:*" → Expected: _distributedCache.Get("$$sentinel$$:*") returns global timestamp
+		- TAG-014: Verify Pub/Sub WILDCARD message is published after wildcard invalidation → Expected: Message with Type=WildCard, Entity="*" published
+		- TAG-015: Verify all cached items created before wildcard invalidation are considered stale → Expected: IsItemInvalidatedAsync returns true for all items, factory invoked
+		- TAG-016: Verify items created after wildcard invalidation are valid → Expected: IsItemInvalidatedAsync returns false, cached value returned
+		- TAG-017: Verify wildcard invalidation does NOT physically remove cache items → Expected: All items remain in L1/L2, marked invalid via global timestamp
+		- TAG-018: Verify individual tag sentinels are NOT removed on wildcard invalidation → Expected: Previous tag sentinels remain in L2, _tagInvalidationTimes cleared
+	5.3 Error Scenarios
+		- TAG-019: Verify RemoveByTagAsync returns early when tag is null → Expected: No operations performed, no exception thrown
+		- TAG-020: Verify RemoveByTagAsync returns early when tag is empty string → Expected: No operations performed, no exception thrown
+		- TAG-021: Verify RemoveByTagAsync returns early when tag is whitespace only → Expected: No operations performed, no exception thrown
+		- TAG-022: Verify bulk RemoveByTagAsync returns early when tags collection is null → Expected: No operations performed, no exception thrown
+		- TAG-023: Verify bulk RemoveByTagAsync returns early when tags collection is empty → Expected: No operations performed, no exception thrown
+
+-------------------------------------
+6. Pub/Sub Synchronization Scenarios
+-------------------------------------
+	6.1 Message Publishing
+		- PUB-001: Verify UPDATE message contains correct Identifier property → Expected: Message.Identifier = _identifier
+		- PUB-002: Verify UPDATE message contains correct Entity property (cache key) → Expected: Message.Entity = key
+		- PUB-003: Verify REMOVE message has Type = HybridCacheMessageType.Remove → Expected: Message.Type = Remove (2)
+		- PUB-004: Verify TAG message has Type = HybridCacheMessageType.Tag → Expected: Message.Type = Tag (3)
+		- PUB-005: Verify WILDCARD message has Type = HybridCacheMessageType.WildCard → Expected: Message.Type = WildCard (4)
+		- PUB-006: Verify messages are published with DeliveryOption.All → Expected: All subscribers receive message
+		- PUB-007: Verify publish failure is logged but does not throw exception → Expected: Error logged, operation continues
+	6.2 Message Receiving (SyncL1Callback)
+		- PUB-008: Verify UPDATE message triggers fetch from L2 and L1 update with LocalCacheExpiration → Expected: _memoryCache.Insert called with L2 value, LocalCacheExpiration from config applied
+		- PUB-009: Verify REMOVE message triggers L1 cache removal → Expected: _memoryCache.Remove(key) called
+		- PUB-010: Verify TAG message triggers TagKeeper.SyncL1TagFromL2 for each tag → Expected: _tagInvalidationTimes[tag] updated from L2 sentinel
+		- PUB-011: Verify WILDCARD message triggers TagKeeper.SyncWildCardFromL2 → Expected: _globalInvalidationTimestamp updated from L2 "$$sentinel$$:*", _tagInvalidationTimes cleared
+		- PUB-012: Verify messages from same instance (matching Identifier) are ignored → Expected: No cache operations performed, early return
+		- PUB-013: Verify messages with null Payload are ignored → Expected: No exception, debug log written, no processing
+		- PUB-014: Verify messages with wrong Payload type are ignored → Expected: No exception, processing skipped
+		- PUB-015: Verify UPDATE message for key not in L2 is handled gracefully → Expected: L2 Get returns null, L1 not updated, debug log written
+		- PUB-016: Verify REMOVE message for key not in L1 is handled gracefully → Expected: No exception, Remove operation completes
+		- PUB-017: Verify exception in SyncL1Callback is caught and logged → Expected: Error logged, subscription remains active, no crash
+		- PUB-018: Verify UPDATE message handles multiple keys (bulk operation) → Expected: Each key fetched from L2 and updated in L1
+		- PUB-019: Verify REMOVE message handles multiple keys (bulk operation) → Expected: All keys removed from L1 via RemoveBulk
+
+-----------------------
+7. TagKeeper Scenarios
+-----------------------
+	7.1 Tag Tracking
+		- TKP-001: Verify tag invalidation time is stored in ConcurrentDictionary → Expected: _tagInvalidationTimes.ContainsKey(tag) = true
+		- TKP-002: Verify multiple tags can be tracked independently → Expected: Each tag has unique timestamp
+		- TKP-003: Verify global invalidation timestamp is updated on wildcard invalidation → Expected: _globalInvalidationTimestamp.Result = new timestamp
+		- TKP-004: Verify individual tag times are cleared on wildcard invalidation → Expected: _tagInvalidationTimes.IsEmpty = true
+		- TKP-005: Verify initial _globalInvalidationTimestamp is 0 → Expected: _globalInvalidationTimestamp.Result = 0L
+	7.2 Tag Validation (IsItemInvalidatedAsync)
+		- TKP-006: Verify returns true when creationTimestamp < _globalInvalidationTimestamp → Expected: true (item created before wildcard invalidation)
+		- TKP-007: Verify returns false when creationTimestamp > _globalInvalidationTimestamp and no tags → Expected: false (item created after wildcard)
+		- TKP-008: Verify returns true when any tag's invalidation time >= creationTimestamp → Expected: true (at least one tag invalidated)
+		- TKP-009: Verify returns false when all tag invalidation times < creationTimestamp → Expected: false (all tags valid)
+		- TKP-010: Verify returns false when tags collection is null → Expected: false (only global timestamp checked)
+		- TKP-011: Verify returns false when tags collection is empty → Expected: false (only global timestamp checked)
+		- TKP-012: Verify unknown tags are fetched from L2 sentinel "$$sentinel$$:{tag}" and cached locally → Expected: L2 sentinel read, _tagInvalidationTimes[tag] = L2 value
+		- TKP-013: Verify bulk fetch from L2 for multiple unknown tags using GetBulk → Expected: Single GetBulk(sentinelKeys) call for efficiency
+		- TKP-014: Verify SyncWildCardFromL2 is called when _globalInvalidationTimestamp.Result is 0 → Expected: L2 "$$sentinel$$:*" checked, _globalInvalidationTimestamp initialized
+	7.3 L2 Synchronization
+		- TKP-015: Verify SyncL1TagFromL2 fetches tag timestamp from L2 sentinel "$$sentinel$$:{tag}" → Expected: _tagInvalidationTimes[tag] = timestamp from L2
+		- TKP-016: Verify SyncWildCardFromL2 fetches global timestamp from L2 sentinel "$$sentinel$$:*" → Expected: _globalInvalidationTimestamp.Result = timestamp from L2
+		- TKP-017: Verify SyncWildCardFromL2 clears _tagInvalidationTimes dictionary → Expected: _tagInvalidationTimes.Clear() called after wildcard sync
+		- TKP-018: Verify GetTagFromL2 returns long.MinValue when sentinel not found in L2 → Expected: long.MinValue returned (default value)
+		- TKP-019: Verify sentinel key format is "$$sentinel$$:{tag}" for specific tags → Expected: NCacheHybridCacheHelper.ToSentinelKey(tag) returns "$$sentinel$$:{tag}"
+		- TKP-020: Verify sentinel key format is "$$sentinel$$:*" for wildcard → Expected: NCacheHybridCacheHelper.ToSentinelKey("*") returns "$$sentinel$$:*"
+		- TKP-021: Verify bulk GetTagsFromL2 uses GetBulk for efficiency → Expected: Single _distributedCache.GetBulk call with all sentinel keys
+
+------------------------
+8. Multi-Node Scenarios
+------------------------
+	8.1 Cross-Node Synchronization
+		- MN-001: Verify SetAsync on Node A triggers L1 update on Node B via Pub/Sub → Expected: Node B L1 contains updated value
+		- MN-002: Verify RemoveAsync on Node A triggers L1 removal on Node B via Pub/Sub → Expected: Node B L1 no longer contains key
+		- MN-003: Verify RemoveByTagAsync on Node A triggers tag sync on Node B → Expected: Node B _tagInvalidationTimes updated
+		- MN-004: Verify wildcard invalidation on Node A propagates to all nodes → Expected: All nodes have updated _globalInvalidationTimestamp
+		- MN-005: Verify new node joining receives current tag state from L2 sentinels → Expected: New node validates tags correctly against L2
+		- MN-006: Verify Node A and Node B have unique identifiers → Expected: _identifier values differ
+		- MN-007: Verify message from Node A is not processed by Node A → Expected: Node A ignores own messages
+	8.2 Eventual Consistency
+		- MN-008: Verify concurrent writes to same key from different nodes result in last-write-wins → Expected: Final L2 value is from last write
+		- MN-009: Verify L1 caches eventually consistent after Pub/Sub propagation → Expected: All L1 caches have same value after sync
+		- MN-010: Verify tag invalidation is eventually consistent across all nodes → Expected: All nodes report item as invalid
+		- MN-011: Verify brief inconsistency window exists during Pub/Sub propagation → Expected: Small window where nodes have different L1 state

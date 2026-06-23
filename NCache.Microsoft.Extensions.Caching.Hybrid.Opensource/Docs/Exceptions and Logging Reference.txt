@@ -1,0 +1,87 @@
+================================================================================
+NCache HybridCache Public Exceptions and Logging Reference
+================================================================================
+
+Package: NCache.OSS.Microsoft.Extensions.Caching.Hybrid
+Version: 5.3.6.1
+Namespace: NCache.OSS.Microsoft.Extensions.Caching.Hybrid
+
+================================================================================
+EXCEPTIONS REFERENCE
+================================================================================
+
+ArgumentNullException:
+    Thrown by:
+        - SetAsync: If key is null or empty
+        - SetAsync: If value is null
+        - AddNCacheHybridCache: If services or configuration is null
+    
+    Message format:
+        - "Value cannot be null. (Parameter '{parameterName}')"
+
+InvalidOperationException:
+    Thrown by:
+        - NCacheHybridCache constructor: If configuration is invalid
+        - NCacheHybridCache constructor: If L1 cache cannot be initialized
+        - NCacheHybridCache constructor: If L2 cache cannot be initialized
+        - NCacheHybridCache constructor: If Pub/Sub topic cannot be created
+    
+    Message format:
+        - Configuration error: "{specific validation message}"
+        - Cache init error: "Failed to initialize {L1/L2} cache: {cacheType}..."
+        - Topic error: "Failed to get or create pub/sub topic..."
+
+Other Exceptions:
+    - Factory exceptions are propagated as-is with logging
+    - NCache internal exceptions (OperationFailedException, etc.) are logged and re-thrown
+    - Network errors, timeout errors propagate from NCache SDK
+
+
+================================================================================
+LOGGING
+================================================================================
+
+Logger:
+    - Type: ILogger<NCacheHybridCache>
+    - Provided via dependency injection
+    - Falls back to NullLogger if not provided or EnableLogs = false
+
+Log Levels:
+    LogDebug:
+        - Cache layer operations (L1/L2 reads/writes)
+        - Flag evaluation
+        - Semaphore operations
+        - Pub/Sub message details
+        
+    LogInformation:
+        - Cache hits/misses
+        - Factory invocations
+        - Tag invalidations
+        - Public API entry/exit points
+        - Disposal
+        
+    LogError:
+        - Exceptions during cache operations
+        - Factory invocation failures
+        - Pub/Sub publish failures
+        - Configuration validation errors
+
+Structured Logging:
+    - Uses message templates with named parameters
+    - Example: "L1 cache hit for key '{Key}'"
+    - Enables log filtering and analysis
+
+Configuration:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│   appsettings.json: 	                                                                  │
+│ 	    {                                                                                 │
+│ 	      "Logging": {                                                                    │
+│ 	        "LogLevel": {                                                                 │
+│ 	          "NCache.Microsoft.Extensions.Caching.Hybrid.Opensource": "Debug"            │
+│ 	        }                                                                             │
+│ 	      },                                                                              │
+│ 	      "NCacheHybridCacheConfiguration": {                                             │
+│ 	        "EnableLogs": true                                                            │
+│ 	      }                                                                               │
+│ 	    }                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
