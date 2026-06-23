@@ -1,0 +1,508 @@
+﻿================================================================================
+NCacheHybridCache Integration OSS Workflow Docs
+================================================================================
+
+================================================================================
+Architecture Summary
+================================================================================
+- NCache HybridCache Open Source integration will utilize 2 caches for hybrid functionality
+	- An InProc local Cache as L1 (demoLocalCache)
+		- Unique to all the server hosting the application instances
+		- Added in configuration so name can be different
+	- A Replicated Cache as L2 (demoCache)
+		- This will be used as distributed cache
+
+	┌──────────────────────────────────────────────────────────────────┐
+	│                         APPLICATION LAYER                        │
+	│  ┌─────────────┐    ┌─────────────┐       	  ┌─────────────┐  │
+	│  │  App Node 1 │    │  App Node 2 │       	  │  App Node N │  │
+	│  │ ┌─────────┐ │    │ ┌─────────┐ │       	  │ ┌─────────┐ │  │
+	│  │ │L1 Cache │ │    │ │L1 Cache │ │  .........  │ │L1 Cache │ │  │
+	│  │ │(InProc) │ │    │ │(InProc) │ │       	  │ │(InProc) │ │  │
+	│  │ └────┬────┘ │    │ └────┬────┘ │       	  │ └────┬────┘ │  │
+	│  └──────┼──────┘    └──────┼──────┘       	  └──────┼──────┘  │
+	│         │                  │              	         │         │
+	│         └──────────────────┼───────────────────────────┘         │
+	│                            │ Pub/Sub Topic                       │
+	│                            ▼                                     │
+	│  ┌────────────────────────────────────────────────────────────┐  │
+	│  │               NCache Distributed Cache (L2)         	    │  │
+	│  │  ┌────────────┐  ┌────────────┐             ┌────────────┐ │  │
+	│  │  │  Server 1  │  │  Server 2  │  .........  │  Server N  │ │  │
+	│  │  └────────────┘  └────────────┘             └────────────┘ │  │
+	│  └────────────────────────────────────────────────────────────┘  │
+	└──────────────────────────────────────────────────────────────────┘
+
+	
+================================================================================
+Workflow Flows
+================================================================================
+
+	- Initialization Flow
+	----------------------
+		┌─────────────────────────────────────────────────────────────────────────┐
+		│                      APPLICATION STARTUP                                │
+		└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+		┌─────────────────────────────────────────────────────────────────────────┐
+		│ 1. AddNCacheHybridCache() called in Program.cs                          │
+		│    - Binds NCacheHybridCacheConfiguration from appsettings.json         │
+		│    - Registers HybridCache as singleton                                 │
+		└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+		┌─────────────────────────────────────────────────────────────────────────┐
+		│ 2. NCacheHybridCache Constructor                                        │
+		│    ├─► Validate configuration (LocalCacheName, DistributedCacheName)    │
+		│    ├─► Initialize L1 Cache: CacheManager.GetCache(LocalCacheName)       │
+		│    ├─► Initialize L2 Cache: CacheManager.GetCache(DistributedCacheName) │
+		│    ├─► Initialize TagKeeper with L2 cache reference                     │
+		│    ├─► Generate unique identifier (IP:ClientID)                         │
+		│    ├─► Get or Create Pub/Sub topic                                      │
+		│    └─► Subscribe to topic with SyncL1Callback                           │
+		└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+		┌─────────────────────────────────────────────────────────────────────────┐
+		│ 3. Ready to serve cache requests                                        │
+		└─────────────────────────────────────────────────────────────────────────┘
+	
+	
+	- API Flow
+	-----------
+		
+		- API: GetOrCreateAsync Flow (Cache Read)
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ GetOrCreateAsync(key, state, factory, options, tags)                    │
+			└─────────────────────────────────────────────────────────────────────────┘
+												│
+												▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 0: Validate Input Key and Cache Flags                              │
+			│ ───────────────────────────────────────                                 │
+			│ IF key is null/empty OR (BOTH DisableLocalCacheRead AND                 │
+			│    DisableDistributedCacheRead flags ARE set):                          │
+			│   ├─► IF DisableUnderlyingData flag IS set:                             │
+			│   │   └─► Return default(T) ───────────────────────────► [END]          │
+			│   │                                                                     │
+			│   └─► ELSE: Invoke factory and return value ────────────► [END]         │
+			│       (No caching performed - both cache tiers disabled)                │
+			└─────────────────────────────────────────────────────────────────────────┘
+												│
+												▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 1: Check L1 (Local Cache)                                          │
+			│ ──────────────────────────────                                          │
+			│ IF DisableLocalCacheRead flag NOT set:                                  │
+			│   └─► Attempt _memoryCache.Get<NCacheHybridCacheItem>(key)              │
+			│       │                                                                 │
+			│       ├─► HIT: Check tag invalidation via TagKeeper                     │
+			│       │   ├─► Tags VALID: Return item.GetValue<T>() ──────► [END]       │
+			│       │   └─► Tags INVALID: Set isItemInvalid=true, Continue to L2      │
+			│       │                                                                 │
+			│       └─► MISS: Continue to L2                                          │
+			└─────────────────────────────────────────────────────────────────────────┘
+												│
+												▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 2: Check L2 (Distributed Cache)                                    │
+			│ ──────────────────────────────────                                      │
+			│ IF DisableDistributedCacheRead flag NOT set:                            │
+			│   (Note: L2 is checked EVEN IF L1 item was invalidated,                │
+			│    as L2 might have a fresher version)                                  │
+			│   │                                                                     │
+			│   └─► Attempt _distributedCache.Get<NCacheHybridCacheItem>(key)         │
+			│       │                                                                 │
+			│       ├─► HIT: Check tag invalidation via TagKeeper                     │
+			│       │   ├─► Tags VALID:                                               │
+			│       │   │   ├─► IF DisableLocalCache flag NOT set:                    │
+			│       │   │   │   ├─► Apply LocalCacheExpiration (options or config)    │
+			│       │   │   │   └─► _memoryCache.Insert(key, item)                    │
+			│       │   │   └─► Return item.GetValue<T>() ───────────► [END]          │
+			│       │   │                                                             │
+			│       │   └─► Tags INVALID: Set isItemInvalid=true, Continue            │
+			│       │                                                                 │
+			│       └─► MISS: Continue to Factory                                     │
+			└─────────────────────────────────────────────────────────────────────────┘
+												│
+												▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 3: Check DisableUnderlyingData Flag                                │
+			│ ────────────────────────────────────                                    │
+			│ IF DisableUnderlyingData flag IS set:                                   │
+			│   └─► Return default(T) ───────────────────────────────► [END]          │
+			│                                                                         │
+			│ ELSE: Continue to Stampede Prevention                                   │
+			└─────────────────────────────────────────────────────────────────────────┘
+												│
+												▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 4: Acquire Semaphore Lock (Stampede Prevention)                    │
+			│ ─────────────────────────────────────────────────────                   │
+			│ SemaphoreSlim lock = _reqLocks.GetOrAdd(key, new SemaphoreSlim(1,1))    │
+			│ await lock.WaitAsync(cancellationToken)                                 │
+			│                                                                         │
+			│ ► Re-check L1 after acquiring lock (double-check pattern)               │
+			│   └─► HIT: Return item.GetValue<T>(), release lock ────► [END]          │
+			└─────────────────────────────────────────────────────────────────────────┘
+												│
+												▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 5: Invoke Factory Function                                         │
+			│ ───────────────────────────────                                         │
+			│ T freshValue = await factory(state, cancellationToken)                  │
+			└─────────────────────────────────────────────────────────────────────────┘
+												│
+												▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 6: Populate L2 (Distributed Cache)                                 │
+			│ ────────────────────────────────────                                    │
+			│ IF (DisableDistributedCacheWrite AND DisableDistributedCache NOT set):  │
+			│   ├─► Create NCacheHybridCacheItem(freshValue, tags)                    │
+			│   ├─► Apply Expiration (options.Expiration or config default)           │
+			│   └─► _distributedCache.Insert(key, cacheItem)                          │
+			└─────────────────────────────────────────────────────────────────────────┘
+												│
+												▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 7: Populate L1 (Local Cache)                                       │
+			│ ──────────────────────────────                                          │
+			│ IF (DisableLocalCacheWrite AND DisableLocalCache NOT set):              │
+			│   ├─► Create NCacheHybridCacheItem(freshValue, tags)                    │
+			│   ├─► Apply LocalCacheExpiration (options or config default)            │
+			│   └─► _memoryCache.Insert(key, cacheItem)                               │
+			└─────────────────────────────────────────────────────────────────────────┘
+												│
+												▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 8: Release Lock & Return                                           │
+			│ ──────────────────────────────                                          │
+			│ TRY-FINALLY block ensures cleanup:                                      │
+			│   ├─► semaphore.Release()                                               │
+			│   ├─► _reqLocks.TryRemove(key, out _)                                   │
+			│   └─► return freshValue ────────────────────────────────► [END]         │
+			└─────────────────────────────────────────────────────────────────────────┘
+			
+			
+		- API: SetAsync Flow (Cache Write)
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ SetAsync(key, value, options, tags)                                     │
+			└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 1: Validate Input                                                  │
+			│ ──────────────────                                                      │
+			│ IF key is null or empty:                                                │
+			│   └─► Throw ArgumentNullException ─────────────────────► [ERROR]        │
+			│                                                                         │
+			│ IF value is null:                                                       │
+			│   └─► Throw ArgumentNullException ─────────────────────► [ERROR]        │
+			└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 2: Write to L2 (Distributed Cache)                                 │
+			│ ────────────────────────────────────                                    │
+			│ IF DisableDistributedCacheWrite flag NOT set:                           │
+			│   ├─► Create NCacheHybridCacheItem(value, tags)                         │
+			│   │   └─► Captures CreatedTimeStamp = now                               │
+			│   │                                                                     │
+			│   ├─► Apply Expiration:                                                 │
+			│   │   ├─► IF options.Expiration.HasValue: Use it                        │
+			│   │   └─► ELSE IF config.DistributedCacheExpiration.HasValue: Use it    │
+			│   │                                                                     │
+			│   ├─► _distributedCache.Insert(key, cacheItem)                          │
+			│   │                                                                     │
+			│   └─► PublishCacheUpdate(key, isUpdate: true)                           │
+			│       └─► Broadcasts UPDATE message to all nodes via Pub/Sub            │
+			└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 3: Write to L1 (Local Cache)                                       │
+			│ ──────────────────────────────                                          │
+			│ IF DisableLocalCacheWrite flag NOT set:                                 │
+			│   ├─► Create NCacheHybridCacheItem(value, tags)                         │
+			│   │                                                                     │
+			│   ├─► Apply LocalCacheExpiration:                                       │
+			│   │   ├─► IF options.LocalCacheExpiration.HasValue: Use it              │
+			│   │   └─► ELSE IF config.LocalCacheExpiration.HasValue: Use it          │
+			│   │                                                                     │
+			│   └─► _memoryCache.Insert(key, cacheItem)                               │
+			└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 4: Complete                                                        │
+			│ ────────────────                                                        │
+			│ Operation completed successfully ───────────────────────► [END]         │
+			└─────────────────────────────────────────────────────────────────────────┘
+		
+		
+		- API: RemoveAsync Flow (Single Key-Based Removal)
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ RemoveAsync(key)                                                        │
+			└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 1: Validate Input                                                  │
+			│ ──────────────────                                                      │
+			│ IF key is null or empty:                                                │
+			│   └─► Return immediately ──────────────────────────────► [END]          │
+			└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 2: Remove from L1 (Local Cache)                                    │
+			│ ─────────────────────────────────                                       │
+			│ _memoryCache.Remove(key)                                                │
+			└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 3: Remove from L2 (Distributed Cache)                              │
+			│ ───────────────────────────────────────                                 │
+			│ _distributedCache.Remove(key)                                           │
+			└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 4: Publish Removal Notification                                    │
+			│ ─────────────────────────────                                           │
+			│ PublishCacheUpdate(key, isUpdate: false)                                │
+			│ └─► Broadcasts REMOVE message to all nodes via Pub/Sub                  │
+			└─────────────────────────────────────────────────────────────────────────┘
+
+
+		- API: RemoveAsync Flow (Bulk Keys Removal)
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ RemoveAsync(IEnumerable<string> keys)                                   │
+			└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 1: Validate Input                                                  │
+			│ ──────────────────                                                      │
+			│ IF keys is null or empty:                                               │
+			│   └─► Return immediately ──────────────────────────────► [END]          │
+			└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 2: Remove from L1 (Local Cache)                                    │
+			│ ─────────────────────────────────                                       │
+			│ _memoryCache.RemoveBulk(keys)                                           │
+			└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 3: Remove from L2 (Distributed Cache)                              │
+			│ ───────────────────────────────────────                                 │
+			│ _distributedCache.RemoveBulk(keys)                                      │
+			└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 4: Publish Bulk Removal Notification                               │
+			│ ──────────────────────────────────                                      │
+			│ PublishCacheUpdate(keys, isUpdate: false)                               │
+			│ └─► Broadcasts REMOVE message with multiple keys to all nodes           │
+			└─────────────────────────────────────────────────────────────────────────┘
+
+
+		- API: RemoveByTagAsync Flow (Single Tag-Based Invalidation)
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ RemoveByTagAsync(tag)                                                   │
+			│ ─────────────────────                                                   │
+			│ IMPORTANT: Uses LOGICAL deletion via timestamp, NOT physical removal    │
+			│            Cache entries remain in L1/L2 but are treated as invalid     │
+			└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 1: Validate Input                                                  │
+			│ ──────────────────                                                      │
+			│ IF tag is null or empty:                                                │
+			│   └─► Return immediately ──────────────────────────────► [END]          │
+			└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 2: Mark Tag Invalid in TagKeeper                                   │
+			│ ──────────────────────────────────                                      │
+			│ await _tagKeeper.MarkTagInvalidAsync(tag)                               │
+			│    │                                                                    │
+			│    ├─► IF tag == "*" (Wildcard):                                        │
+			│    │   ├─► Set _globalInvalidationTimestamp = now                       │
+			│    │   ├─► Clear all _tagInvalidationTimes                              │
+			│    │   └─► Store sentinel in L2: "$$sentinel$$:*" = timestamp           │
+			│    │                                                                    │
+			│    └─► ELSE (Specific tag):                                             │
+			│        ├─► Set _tagInvalidationTimes[tag] = now                         │
+			│        └─► Store sentinel in L2: "$$sentinel$$:{tag}" = timestamp       │
+			└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 3: Publish Tag Invalidation Notification                           │
+			│ ──────────────────────────────────────                                  │
+			│ PublishTagInvalidation(tag)                                             │
+			│    │                                                                    │
+			│    ├─► IF tag == "*": Send WILDCARD message                             │
+			│    └─► ELSE: Send TAG message                                           │
+			│                                                                         │
+			│ └─► Broadcasts to all nodes via Pub/Sub                                 │
+			└─────────────────────────────────────────────────────────────────────────┘
+
+
+		- API: RemoveByTagAsync Flow (Bulk Tags Invalidation)
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ RemoveByTagAsync(IEnumerable<string> tags)                              │
+			│ ──────────────────────────────────────                                  │
+			│ IMPORTANT: Uses LOGICAL deletion via timestamps, NOT physical removal   │
+			│            Cache entries remain in L1/L2 but are treated as invalid     │
+			└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 1: Validate Input                                                  │
+			│ ──────────────────                                                      │
+			│ IF tags is null or empty:                                               │
+			│   └─► Return immediately ──────────────────────────────► [END]          │
+			└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 2: Mark Multiple Tags Invalid in TagKeeper                         │
+			│ ────────────────────────────────────────                                │
+			│ await _tagKeeper.MarkTagInvalidAsync(tags)                              │
+			│    │                                                                    │
+			│    └─► FOR each tag in tags:                                            │
+			│        ├─► IF tag == "*" (Wildcard):                                    │
+			│        │   ├─► Set _globalInvalidationTimestamp = now                   │
+			│        │   ├─► Clear all _tagInvalidationTimes                          │
+			│        │   └─► Store sentinel in L2: "$$sentinel$$:*" = timestamp       │
+			│        │                                                                │
+			│        └─► ELSE (Specific tag):                                         │
+			│            ├─► Set _tagInvalidationTimes[tag] = now                     │
+			│            └─► Store sentinel in L2: "$$sentinel$$:{tag}" = timestamp   │
+			└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+			┌─────────────────────────────────────────────────────────────────────────┐
+			│ STEP 3: Publish Bulk Tag Invalidation Notification                      │
+			│ ───────────────────────────────────────────                             │
+			│ PublishTagInvalidation(tags)                                            │
+			│ └─► Broadcasts TAG message with multiple tags to all nodes              │
+			└─────────────────────────────────────────────────────────────────────────┘
+	
+	
+	-  Tag Invalidation Check Flow
+	-------------------------------
+		┌─────────────────────────────────────────────────────────────────────────┐
+		│ IsItemInvalidatedAsync(createdTimestamp, tags)                          │
+		│ Called during GetOrCreateAsync to validate cached items                 │
+		└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+		┌─────────────────────────────────────────────────────────────────────────┐
+		│ 1. Check Master Clock (Global Invalidation)                             │
+		│    IF _globalInvalidationTimestamp == 0:                                │
+		│    └─► Sync from L2: SyncWildCardFromL2()                               │
+		│                                                                         │
+		│    IF _globalInvalidationTimestamp >= createdTimestamp:                 │
+		│    └─► Return TRUE (item is INVALID) ──────────────────► [END]          │
+		└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+		┌─────────────────────────────────────────────────────────────────────────┐
+		│ 2. Check Individual Tags                                                │
+		│    FOR each tag in item.Tags:                                           │
+		│    │                                                                    │
+		│    ├─► IF tag exists in _tagInvalidationTimes:                          │
+		│    │   └─► IF invalidationTime >= createdTimestamp:                     │
+		│    │       └─► Return TRUE (item is INVALID) ──────────► [END]          │
+		│    │                                                                    │
+		│    └─► ELSE: Add to searchList for L2 lookup                            │
+		└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+		┌─────────────────────────────────────────────────────────────────────────┐
+		│ 3. Bulk Check Unknown Tags from L2                                      │
+		│    IF searchList is not empty:                                          │
+		│    ├─► Fetch sentinels from L2: _distributedCache.GetBulk(searchList)   │
+		│    ├─► Cache results in _tagInvalidationTimes                           │
+		│    └─► IF any tag invalidationTime >= createdTimestamp:                 │
+		│        └─► Return TRUE (item is INVALID) ──────────────► [END]          │
+		└─────────────────────────────────────────────────────────────────────────┘
+											│
+											▼
+		┌─────────────────────────────────────────────────────────────────────────┐
+		│ 4. Return FALSE (item is VALID)                                         │
+		└─────────────────────────────────────────────────────────────────────────┘
+		
+		
+	- Pub/Sub Synchronization Flow (Cross-Node)
+	--------------------------------------------
+		┌─────────────────────────────────────────────────────────────────────────┐
+		│                         NODE A (Publisher)                              │
+		│ ─────────────────────────────────────────                               │
+		│ Performs SetAsync/RemoveAsync/RemoveByTagAsync                          │
+		│ └─► Publishes NCacheHybridCacheMessage to Topic                         │
+		└─────────────────────────────────────────────────────────────────────────┘
+											│
+											│ Message via NCache Pub/Sub
+											▼
+		┌─────────────────────────────────────────────────────────────────────────┐
+		│                    NODE B, C, D... (Subscribers)                        │
+		│ ─────────────────────────────────────────────                           │
+		│ SyncL1Callback receives message                                         │
+		│                                                                         │
+		│ 1. Check message.Identifier != _identifier (ignore own messages)        │
+		│                                                                         │
+		│ 2. Process based on message.Type:                                       │
+		│                                                                         │
+		│    ├─► UPDATE:                                                          │
+		│    │   └─► Fetch updated item from L2                                   │
+		│    │   └─► _memoryCache.Insert(key, newItem)                            │
+		│    │                                                                    │
+		│    ├─► REMOVE:                                                          │
+		│    │   └─► _memoryCache.Remove(key)                                     │
+		│    │                                                                    │
+		│    ├─► TAG:                                                             │
+		│    │   └─► _tagKeeper.SyncL1TagFromL2(tag)                              │
+		│    │       └─► Updates local _tagInvalidationTimes from L2              │
+		│    │                                                                    │
+		│    └─► WILDCARD:                                                        │
+		│        └─► _tagKeeper.SyncWildCardFromL2()                              │
+		│            └─► Updates _globalInvalidationTimestamp from L2             │
+		│            └─► Clears _tagInvalidationTimes                             │
+		└─────────────────────────────────────────────────────────────────────────┘
+
+		
+================================================================================
+TAG VALIDATION RULES
+================================================================================
+
+Tag Names:
+    - Cannot be null or empty strings
+    - Cannot be whitespace-only strings
+    - Cannot contain the wildcard character '*' when used as regular tags
+    - The special tag "*" (wildcard) is reserved for invalidating ALL cache entries
+    - Tags are case-sensitive
+    - No length restrictions (limited by underlying NCache constraints)
+
+Tag Usage:
+    - Tags are stored with each cache entry in NCacheHybridCacheItem
+    - Tags are used for grouping related cache entries
+    - Tags enable efficient invalidation of multiple entries
+    - Tags support hierarchical organization (e.g., "entity:product", "category:1")
+
+Tag Invalidation:
+    - RemoveByTagAsync uses logical deletion (timestamp-based)
+    - Entries remain in cache but treated as invalid
+    - Invalidation persisted in L2 via sentinel keys
+    - Invalidation timestamps synchronized across all nodes via Pub/Sub

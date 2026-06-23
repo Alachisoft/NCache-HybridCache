@@ -1,0 +1,581 @@
+================================================================================
+NCache HybridCache Public API Reference
+================================================================================
+
+Package: NCache.OSS.Microsoft.Extensions.Caching.Hybrid
+Version: 5.3.6.1
+Namespace: NCache.OSS.Microsoft.Extensions.Caching.Hybrid
+
+================================================================================
+PUBLIC METHODS
+================================================================================
+
+--------------------------------------------------------------------------------
+1. GetOrCreateAsync<TState, T>
+--------------------------------------------------------------------------------
+
+Signature:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ 	public override ValueTask<T> GetOrCreateAsync<TState, T>(                             │
+│ 	    string key,                                                                       │
+│ 	    TState state,                                                                     │
+│ 	    Func<TState, CancellationToken, ValueTask<T>> factory,                            │
+│ 	    HybridCacheEntryOptions? options = null,                                          │
+│ 	    IEnumerable<string>? tags = null,                                                 │
+│ 	    CancellationToken cancellationToken = default                                     │
+│ 	)                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+Description:
+    Retrieves the value associated with the specified key from the cache, or 
+    creates and adds a new value using the provided factory function if the key 
+    does not exist or is invalidated.
+
+Type Parameters:
+    TState: The type of the state object passed to the factory function
+    T: The type of the value to retrieve or create
+
+Parameters:
+    key (string):
+        - The unique key that identifies the cache entry
+        - Cannot be null or empty unless underlying data fetch is disabled by flags
+        
+    state (TState):
+        - A state object to pass to the factory function when creating a new value
+        - Can be any type, passed through to the factory
+        
+    factory (Func<TState, CancellationToken, ValueTask<T>>):
+        - A function that produces the value to cache if the key is not found or is invalidated
+        - Receives the state object and a cancellation token
+        - Must not be null (unless DisableUnderlyingData flag is set)
+        
+    options (HybridCacheEntryOptions?):
+        - Optional cache entry options that control expiration, cache behavior, and flags
+        - If null, default options are used
+        - See HybridCacheEntryOptions section for details
+        
+    tags (IEnumerable<string>?):
+        - Optional collection of tags to associate with the cache entry
+        - Used for invalidation or grouping purposes
+        - Can be null or empty
+        - Tags cannot contain the wildcard character '*' unless specifically invalidating all entries
+        
+    cancellationToken (CancellationToken):
+        - A cancellation token that can be used to cancel the asynchronous operation
+        - Default: default(CancellationToken)
+
+Returns:
+    ValueTask<T>:
+        - The cached value if found and valid
+        - The value produced by the factory function if cache miss or invalidated
+        - default(T) if the key is null/empty and underlying data fetch is disabled
+
+Behavior:
+    1. Validates that key and value are not null (throws ArgumentNullException if null)
+    2. Checks L1 (local cache) first unless DisableLocalCacheRead flag is set
+    3. On L1 hit: Validates tags via TagKeeper, returns if valid
+    4. On L1 miss or invalidation: Checks L2 (distributed cache) unless DisableDistributedCacheRead flag is set
+       (Note: L2 is checked EVEN IF L1 item was tag-invalidated, as L2 might have a fresher version)
+    5. On L2 hit: Validates tags, populates L1 (unless disabled), returns if valid
+    6. On L2 miss or invalidation: Acquires semaphore lock to prevent stampede
+    7. Re-checks L1 after acquiring lock (double-check pattern)
+    8. Invokes factory function to get fresh value
+    9. Populates L2 (unless DisableDistributedCacheWrite flag is set)
+    10. Populates L1 (unless DisableLocalCacheWrite flag is set)
+    11. Releases lock and returns fresh value
+
+Exceptions:
+    None thrown directly by this method. Exceptions from the factory function are 
+    propagated to the caller with logging.
+
+Thread Safety:
+    Thread-safe. Uses semaphore-based locking per key to prevent concurrent 
+    factory invocations for the same key (cache stampede prevention).
+
+Example:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ 	var product = await cache.GetOrCreateAsync(                                           │
+│ 	    key: $"product:{productId}",                                                      │
+│ 	    state: productId,                                                                 │
+│ 	    factory: async (id, ct) => await database.GetProductAsync(id, ct),                │
+│ 	    options: new HybridCacheEntryOptions                                              │
+│ 	    {                                                                                 │
+│ 	        Expiration = TimeSpan.FromMinutes(30),                                        │
+│ 	        LocalCacheExpiration = TimeSpan.FromMinutes(5)                                │
+│ 	    },                                                                                │
+│ 	    tags: new[] { "products", $"category:{categoryId}" }                              │
+│ 	);                                                                                    │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+--------------------------------------------------------------------------------
+2. SetAsync<T>
+--------------------------------------------------------------------------------
+
+Signature:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ 	public override ValueTask SetAsync<T>(                                                │
+│ 	    string key,                                                                       │
+│ 	    T value,                                                                          │
+│ 	    HybridCacheEntryOptions? options = null,                                          │
+│ 	    IEnumerable<string>? tags = null,                                                 │
+│ 	    CancellationToken cancellationToken = default                                     │
+│ 	)                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+Description:
+    Explicitly sets a value in both L1 and L2 caches
+    options, and tags. Publishes cache update notification to synchronize other 
+    application instances.
+
+Type Parameters:
+    T: The type of the value to cache
+
+Parameters:
+    key (string):
+        - The unique key under which the value is stored
+        - Cannot be null or empty
+        - Required parameter
+        
+    value (T):
+        - The value to cache
+        - Cannot be null
+        - Required parameter
+        
+    options (HybridCacheEntryOptions?):
+        - Optional settings that control cache entry behavior
+        - Controls expiration policies and cache write flags
+        - If null, default options are used
+        
+    tags (IEnumerable<string>?):
+        - Optional collection of tags to associate with the cache entry
+        - Used for categorization or filtering
+        - Can be null or empty
+        
+    cancellationToken (CancellationToken):
+        - A cancellation token that can be used to cancel the asynchronous operation
+        - Default: default(CancellationToken)
+
+Returns:
+    ValueTask:
+        - Represents the asynchronous cache set operation
+
+Behavior:
+    1. Validates key and value (throws if null/empty)
+    2. Creates NCacheHybridCacheItem with value and tags
+    3. Writes to L2 (distributed cache) unless DisableDistributedCacheWrite flag is set
+    4. Publishes cache update message via Pub/Sub to notify other nodes
+    5. Writes to L1 (local cache) unless DisableLocalCacheWrite flag is set
+
+Exceptions:
+    ArgumentNullException:
+        - Thrown if key is null or empty
+        - Thrown if value is null
+
+Thread Safety:
+    Thread-safe. Cache operations are atomic.
+
+Example:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ 	await cache.SetAsync(                                                                 │
+│ 	    key: $"config:{configKey}",                                                       │
+│ 	    value: configValue,                                                               │
+│ 	    options: new HybridCacheEntryOptions                                              │
+│ 	    {                                                                                 │
+│ 	        Expiration = TimeSpan.FromHours(1),                                           │
+│ 	        LocalCacheExpiration = TimeSpan.FromMinutes(10)                               │
+│ 	    },                                                                                │
+│ 	    tags: new[] { "configuration" }                                                   │
+│ 	);                                                                                    │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+--------------------------------------------------------------------------------
+3. RemoveAsync (Single Key)
+--------------------------------------------------------------------------------
+
+Signature:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ 	public override ValueTask RemoveAsync(                                                │
+│ 	    string key,                                                                       │
+│ 	    CancellationToken cancellationToken = default                                     │
+│ 	)                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+Description:
+    Asynchronously removes the specified cache entry from both the local and 
+    distributed caches. Publishes removal notification to synchronize other 
+    application instances.
+
+Parameters:
+    key (string):
+        - The key of the cache entry to remove
+        - If null or empty, the method completes without performing any operation
+        
+    cancellationToken (CancellationToken):
+        - A cancellation token that can be used to cancel the remove operation
+        - Default: default(CancellationToken)
+
+Returns:
+    ValueTask:
+        - Represents the asynchronous remove operation
+
+Behavior:
+    1. Returns immediately if key is null or empty
+    2. Removes entry from L1 (local cache)
+    3. Removes entry from L2 (distributed cache)
+    4. Publishes cache update notification (isUpdate: false) via Pub/Sub
+
+Exceptions:
+    None thrown directly. Internal exceptions are logged and re-thrown.
+
+Thread Safety:
+    Thread-safe. Cache removal operations are atomic.
+
+Example:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ 	await cache.RemoveAsync($"product:{productId}");                                      │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+    
+
+
+--------------------------------------------------------------------------------
+4. RemoveAsync (Bulk Keys)
+--------------------------------------------------------------------------------
+
+Signature:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ 	public override ValueTask RemoveAsync(                                                │
+│ 	    IEnumerable<string> keys,                                                         │
+│ 	    CancellationToken cancellationToken = default                                     │
+│ 	)                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+Description:
+    Asynchronously removes multiple cache entries by keys from both the local 
+    and distributed caches in a single operation. More efficient than individual 
+    removals. Publishes bulk removal notification to synchronize other instances.
+
+Parameters:
+    keys (IEnumerable<string>):
+        - The collection of cache keys to remove
+        - If null or empty, the method completes without performing any operation
+        
+    cancellationToken (CancellationToken):
+        - A cancellation token that can be used to cancel the remove operation
+        - Default: default(CancellationToken)
+
+Returns:
+    ValueTask:
+        - Represents the asynchronous bulk remove operation
+
+Behavior:
+    1. Returns immediately if keys is null or empty
+    2. Removes all keys from L1 using RemoveBulk
+    3. Removes all keys from L2 using RemoveBulk
+    4. Publishes single cache update notification with all keys via Pub/Sub
+
+Exceptions:
+    None thrown directly. Internal exceptions are logged and re-thrown.
+
+Thread Safety:
+    Thread-safe. Bulk operations are atomic.
+
+Performance:
+    Significantly more efficient than individual RemoveAsync calls as it:
+    - Uses native bulk APIs (RemoveBulk)
+    - Publishes single Pub/Sub message instead of multiple
+    - Reduces network round trips
+
+Example:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ 	var keysToRemove = new[] { "product:1", "product:2", "product:3" };                   │
+│ 	await cache.RemoveAsync(keysToRemove);                                                │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+--------------------------------------------------------------------------------
+5. RemoveByTagAsync (Single Tag)
+--------------------------------------------------------------------------------
+
+Signature:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ 	public override ValueTask RemoveByTagAsync(                                           │
+│ 	    string tag,                                                                       │
+│ 	    CancellationToken cancellationToken = default                                     │
+│ 	)                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+Description:
+    Asynchronously invalidates all cache entries associated with the specified 
+    tag using LOGICAL DELETION. This method does NOT physically remove cache 
+    entries; instead, it marks the tag as invalid by updating its timestamp in 
+    TagKeeper, causing future cache lookups to treat associated entries as 
+    invalidated. Publishes tag invalidation notification to synchronize other 
+    application instances.
+
+Parameters:
+    tag (string):
+        - Tag associated with the cache entries to be invalidated
+        - If null or empty, the method completes without performing any operation
+        - Special value "*" (wildcard) invalidates ALL cache entries
+        
+    cancellationToken (CancellationToken):
+        - A cancellation token that can be used to cancel the invalidation operation
+        - Default: default(CancellationToken)
+
+Returns:
+    ValueTask:
+        - Represents the asynchronous tag invalidation operation
+
+Behavior:
+    1. Returns immediately if tag is null or empty
+    2. Calls TagKeeper.MarkTagInvalidAsync(tag) which:
+       - If tag == "*": Sets global invalidation timestamp, clears all tag timestamps
+       - If specific tag: Sets tag-specific invalidation timestamp
+       - Stores sentinel key in L2: "$$sentinel$$:{tag}" = timestamp
+    3. Publishes tag invalidation message (Tag or WildCard type) via Pub/Sub
+    4. Other nodes receive message and sync their TagKeeper timestamps from L2
+
+Logical Deletion:
+    - Cache entries remain physically stored in L1 and L2 until their expiration
+    - During GetOrCreateAsync, TagKeeper.IsItemInvalidatedAsync checks if item's 
+      creation timestamp < tag's invalidation timestamp
+    - If invalidated, factory is re-invoked to get fresh value
+    - More efficient than physical removal in distributed systems
+
+Exceptions:
+    None thrown directly. Internal exceptions are logged and re-thrown.
+
+Thread Safety:
+    Thread-safe. TagKeeper operations use concurrent data structures.
+
+Example:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ 	// Invalidate all products in a category                                              │
+│ 	await cache.RemoveByTagAsync($"category:{categoryId}");                               │
+│ 	                                                                                      │
+│ 	// Invalidate all cache entries                                                       │
+│ 	await cache.RemoveByTagAsync("*");                                                    │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+--------------------------------------------------------------------------------
+6. RemoveByTagAsync (Bulk Tags)
+--------------------------------------------------------------------------------
+
+Signature:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ 	public override ValueTask RemoveByTagAsync(                                           │
+│ 	    IEnumerable<string> tags,                                                         │
+│ 	    CancellationToken cancellationToken = default                                     │
+│ 	)                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+Description:
+    Asynchronously invalidates all cache entries associated with multiple tags 
+    in a single operation using LOGICAL DELETION. Similar to single-tag variant, 
+    this method marks all specified tags as invalid via timestamp updates without 
+    physically removing cache entries. Publishes bulk tag invalidation 
+    notification to synchronize other application instances.
+
+Parameters:
+    tags (IEnumerable<string>):
+        - Collection of tags identifying the cache entries to invalidate
+        - If null or empty, the method completes without performing any operation
+        - Can include the wildcard "*" to invalidate all entries
+        
+    cancellationToken (CancellationToken):
+        - A cancellation token that can be used to cancel the operation
+        - Default: default(CancellationToken)
+
+Returns:
+    ValueTask:
+        - Represents the asynchronous bulk tag invalidation operation
+
+Behavior:
+    1. Returns immediately if tags is null or empty
+    2. Calls TagKeeper.MarkTagInvalidAsync(tags) which:
+       - Iterates through all tags
+       - For each tag: Sets invalidation timestamp
+       - Stores sentinels in L2 using InsertBulk for efficiency
+    3. Publishes single tag invalidation message with all tags via Pub/Sub
+    4. Other nodes receive message and sync their TagKeeper timestamps from L2
+
+Logical Deletion:
+    - Same behavior as single tag invalidation
+    - Cache entries remain physically stored
+    - Future lookups treat associated entries as invalid
+    - Factory re-invoked on next access
+
+Exceptions:
+    None thrown directly. Internal exceptions are logged and re-thrown.
+
+Thread Safety:
+    Thread-safe. TagKeeper operations use concurrent data structures.
+
+Performance:
+    More efficient than individual RemoveByTagAsync calls as it:
+    - Uses TagKeeper bulk operation
+    - Publishes single Pub/Sub message
+    - Reduces L2 operations via InsertBulk
+
+Example:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ 	var tagsToInvalidate = new[]                                                          │
+│ 	{                                                                                     │
+│ 	    "category:electronics",                                                           │
+│ 	    "category:furniture",                                                             │
+│ 	    "category:clothing"                                                               │
+│ 	};                                                                                    │
+│ 	await cache.RemoveByTagAsync(tagsToInvalidate);                                       │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+--------------------------------------------------------------------------------
+7. Dispose
+--------------------------------------------------------------------------------
+
+Signature:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ 	public void Dispose()                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+Description:
+    Releases all resources used by the current instance. Call this method when 
+    the instance is no longer needed to free managed resources promptly.
+
+Parameters:
+    None
+
+Returns:
+    void
+
+Behavior:
+    1. Disposes the Pub/Sub topic subscription
+    2. Disposes the TagKeeper instance
+    3. Disposes the L1 (local) cache
+    4. Disposes the L2 (distributed) cache
+    5. Disposes all semaphores in the _reqLocks dictionary
+    6. Clears the _reqLocks dictionary
+    7. Logs disposal completion
+
+Exceptions:
+    None thrown. Internal disposal failures are handled gracefully.
+
+Thread Safety:
+    Should only be called once. Not thread-safe for concurrent dispose calls.
+
+Example:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ 	cache.Dispose(); // Typically handled by DI container                                 │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+CLASS: HybridCacheEntryOptions
+================================================================================
+
+Namespace: Microsoft.Extensions.Caching.Hybrid
+
+Description:
+    Specifies options for a cache entry, including expiration times and cache 
+    behavior flags.
+
+Properties:
+    Expiration (TimeSpan?):
+        - Distributed cache (L2) entry expiration time
+        - If null, uses cache's default expiration (typically no expiration)
+        - Applied as absolute expiration from current time
+        
+    LocalCacheExpiration (TimeSpan?):
+        - Local cache (L1) entry expiration time
+        - If null, uses L2 expiration or cache's default
+        - Should typically be shorter than L2 expiration
+        - Applied as absolute expiration from current time
+        
+    Flags (HybridCacheEntryFlags):
+        - Controls cache behavior and selective read/write operations
+        - See HybridCacheEntryFlags section for available flags
+
+Example:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ 	var options = new HybridCacheEntryOptions                                             │
+│ 	{                                                                                     │
+│ 	    Expiration = TimeSpan.FromHours(1),              // L2: 1 hour                    │
+│ 	    LocalCacheExpiration = TimeSpan.FromMinutes(5),  // L1: 5 minutes                 │
+│ 	    Flags = HybridCacheEntryFlags.DisableLocalCacheRead                               │
+│ 	};                                                                                    │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+ENUM: HybridCacheEntryFlags
+================================================================================
+
+Namespace: Microsoft.Extensions.Caching.Hybrid
+
+Description:
+    Flags that control cache entry behavior, allowing selective enabling/disabling 
+    of cache layers for specific operations.
+
+Values:
+    None (0):
+        - Default behavior
+        - Read and write to both L1 and L2 caches
+        - Factory invoked on cache miss
+        
+    DisableLocalCacheRead (1):
+        - Skip L1 (local cache) read operations
+        - Always check L2 or invoke factory
+        - L1 write still enabled (unless also disabled)
+        
+    DisableLocalCacheWrite (2):
+        - Skip L1 (local cache) write operations
+        - Value not stored in L1 after factory invocation
+        - L1 read still enabled (unless also disabled)
+        
+    DisableLocalCache (3):
+        - Combination of DisableLocalCacheRead | DisableLocalCacheWrite
+        - Skip both L1 reads and writes
+        - Only use L2 (distributed cache)
+        
+    DisableDistributedCacheRead (4):
+        - Skip L2 (distributed cache) read operations
+        - On L1 miss, directly invoke factory instead of checking L2
+        - L2 write still enabled (unless also disabled)
+        
+    DisableDistributedCacheWrite (8):
+        - Skip L2 (distributed cache) write operations
+        - Value not stored in L2 after factory invocation
+        - L2 read still enabled (unless also disabled)
+        
+    DisableDistributedCache (12):
+        - Combination of DisableDistributedCacheRead | DisableDistributedCacheWrite
+        - Skip both L2 reads and writes
+        - Only use L1 (local cache)
+        
+    DisableUnderlyingData (16):
+        - Prevent factory invocation on cache miss
+        - Returns default(T) if key not found in enabled cache layers
+        - Useful for cache-only scenarios where underlying data source is unavailable
+
+Flag Combinations:
+    Flags can be combined using bitwise OR (|) operator:
+    
+    DisableLocalCache | DisableDistributedCache:
+        - Disables all caching
+        - Factory always invoked
+        
+    DisableLocalCacheRead | DisableDistributedCacheWrite:
+        - Always check L2 on read
+        - Never write to L2
+        - Useful for read-through scenarios with external L2 population
+
+Example:
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ 	var options = new HybridCacheEntryOptions                                             │
+│ 	{                                                                                     │
+│ 	    Flags = HybridCacheEntryFlags.DisableLocalCache                                   │
+│ 	};                                                                                    │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
