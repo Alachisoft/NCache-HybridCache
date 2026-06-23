@@ -1,0 +1,190 @@
+@using HybridCachePlayground.Web.Models
+@model HybridCachePlayground.Web.Models.BulkSetRequest
+@{
+    ViewData["Title"] = "Bulk Add";
+    var result  = ViewData["Result"] as BulkSetResult;
+    var allTags = ViewData["AllTags"] as List<string> ?? new();
+}
+
+<h2 class="mb-1">Bulk Add</h2>
+<p class="text-muted mb-4">
+    Generates and stores multiple cache entries at once using the random data factory.
+    Each entry gets a unique key (<code>prefix-1</code>, <code>prefix-2</code>, …) and
+    the template label is automatically added as an extra tag.
+</p>
+
+<div class="row g-4">
+    <!-- ── Form ── -->
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header fw-semibold">Configuration</div>
+            <div class="card-body">
+                <form asp-action="BulkSet" method="post">
+                    @Html.AntiForgeryToken()
+
+                    <!-- Key Prefix -->
+                    <div class="mb-3">
+                        <label asp-for="KeyPrefix" class="form-label fw-semibold">Key Prefix</label>
+                        <input asp-for="KeyPrefix" id="KeyPrefix" class="form-control font-monospace"
+                               placeholder="e.g. user, product, session" />
+                        <span asp-validation-for="KeyPrefix" class="text-danger small"></span>
+                        <div class="form-text">
+                            Keys will be generated as <code>prefix-1</code>, <code>prefix-2</code>, …
+                        </div>
+                    </div>
+
+                    <!-- Count -->
+                    <div class="mb-3">
+                        <label asp-for="Count" class="form-label fw-semibold">
+                            Number of Entries
+                            <span class="text-muted fw-normal">(1–500)</span>
+                        </label>
+                        <input asp-for="Count" type="number" class="form-control" min="1" max="500" />
+                        <span asp-validation-for="Count" class="text-danger small"></span>
+                    </div>
+
+                    <!-- Tags -->
+                    <div class="mb-3">
+                        <label asp-for="Tags" class="form-label fw-semibold">
+                            Tags <span class="text-muted fw-normal">(comma-separated, optional)</span>
+                        </label>
+                        <input asp-for="Tags" id="Tags" class="form-control"
+                               placeholder="e.g. bulk-load, tenant-1" />
+                        <div class="form-text">
+                            These tags are added to every entry. The factory template label
+                            (e.g. <em>User</em>, <em>Product</em>) is always added automatically.
+                        </div>
+                        @if (allTags.Any())
+                        {
+                            <div class="mt-2">
+                                <small class="text-muted">Known tags: </small>
+                                @foreach (var t in allTags)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary chip-suggest chip-tag"
+                                            data-fill-id="Tags" data-fill-val="@t">@t</button>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Expiration -->
+                    <div class="mb-4">
+                        <label asp-for="ExpirationMinutes" class="form-label fw-semibold">Expiration (minutes)</label>
+                        <input asp-for="ExpirationMinutes" type="number" class="form-control" min="1" max="1440" />
+                        <span asp-validation-for="ExpirationMinutes" class="text-danger small"></span>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100"
+                            data-bs-toggle="tooltip" title="Generate random data and store multiple entries with auto-incremented keys">
+                        <i class="bi bi-layers me-1"></i>Generate &amp; Store Entries
+                    </button>
+                    <a asp-controller="Home" asp-action="Index" class="btn btn-link w-100 mt-2"
+                       data-bs-toggle="tooltip" title="Return to the dashboard">
+                        <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+                    </a>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Results ── -->
+    <div class="col-md-7">
+        @if (result is not null)
+        {
+            <div class="card border-success mb-3">
+                <div class="card-header bg-success text-white fw-semibold d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-check-circle me-1"></i>@result.Added entries added</span>
+                    <span class="small fw-normal">@result.ElapsedMs ms</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height:480px; overflow-y:auto;">
+                        <table class="table table-sm table-bordered align-middle mb-0">
+                            <thead class="table-dark" style="position:sticky;top:0;z-index:1;">
+                                <tr>
+                                    <th style="width:30px">#</th>
+                                    <th>Key</th>
+                                    <th>Template</th>
+                                    <th>Tags</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (int i = 0; i < result.Entries.Count; i++)
+                                {
+                                    var entry      = result.Entries[i];
+                                    var collapseId = $"bse-{i}";
+                                    <tr>
+                                        <td class="text-muted small text-center">@(i + 1)</td>
+                                        <td><code class="small">@entry.Key</code></td>
+                                        <td>
+                                            <span class="badge text-bg-warning small">@entry.Label</span>
+                                        </td>
+                                        <td>
+                                            @foreach (var tag in entry.Tags)
+                                            {
+                                                <span class="badge text-bg-info badge-tag me-1">@tag</span>
+                                            }
+                                        </td>
+                                        <td style="max-width:200px;">
+                                            <button class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                                    type="button" data-bs-toggle="collapse"
+                                                    data-bs-target="#@collapseId">
+                                                <small>View</small>
+                                            </button>
+                                            <div class="collapse" id="@collapseId">
+                                                <pre class="value-preview small mb-0 mt-1">@entry.ValuePreview</pre>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card h-100" style="border-color:#2d3139; min-height:200px;">
+                <div class="card-body d-flex align-items-center justify-content-center text-muted">
+                    <div class="text-center">
+                        <i class="bi bi-layers fs-1 mb-2 d-block"></i>
+                        <p>Fill in the form and click <strong>Generate &amp; Store Entries</strong>.</p>
+                        <p class="small mb-0">
+                            Results will appear here with a scrollable table of all generated entries.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+    // ── Initialize Bootstrap tooltips ──────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function () {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+
+    document.querySelectorAll('[data-fill-id]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var inputId = btn.getAttribute('data-fill-id');
+            var val     = btn.getAttribute('data-fill-val');
+            var el      = document.getElementById(inputId);
+            if (!el) return;
+            if (btn.classList.contains('chip-tag')) {
+                var parts = el.value.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+                if (!parts.includes(val)) { parts.push(val); }
+                el.value = parts.join(', ');
+            } else {
+                el.value = val;
+            }
+        });
+    });
+    </script>
+}
