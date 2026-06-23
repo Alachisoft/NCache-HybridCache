@@ -1,0 +1,224 @@
+@{
+    ViewData["Title"] = "Debug Tools";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0"><i class="bi bi-tools me-2"></i>Debug Tools</h2>
+        <p class="text-muted mb-0 mt-1">
+            Developer utilities for inspecting and manipulating the cache. L1/L2 clear buttons are stubs — implement
+            <code>DebugToolsService.ClearL1CacheAsync</code> / <code>ClearL2CacheAsync</code> for your provider.
+        </p>
+    </div>
+    <a asp-controller="Home" asp-action="Index" class="btn btn-outline-secondary"
+       data-bs-toggle="tooltip" title="Return to the main dashboard">
+        <i class="bi bi-arrow-left me-1"></i>Dashboard
+    </a>
+</div>
+
+<div class="row g-4">
+
+    <!-- Cache Layers -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header fw-semibold">
+                <i class="bi bi-layers me-1"></i>Cache Layers
+            </div>
+            <div class="card-body d-flex flex-column gap-2">
+                <p class="small text-muted">
+                    Flush individual cache tiers. Stubs until you wire up your provider SDK.
+                </p>
+                <form asp-controller="Tools" asp-action="ClearL1" method="post" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-outline-warning w-100"
+                            data-bs-toggle="tooltip" title="Clear the in-process (L1) cache only">
+                        <i class="bi bi-memory me-1"></i>Clear L1 Cache (In-Process)
+                    </button>
+                </form>
+                <form asp-controller="Tools" asp-action="ClearL2" method="post" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-outline-warning w-100"
+                            data-bs-toggle="tooltip" title="Clear the distributed (L2) cache only">
+                        <i class="bi bi-hdd-network me-1"></i>Clear L2 Cache (Distributed)
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header fw-semibold">
+                <i class="bi bi-bar-chart me-1"></i>Statistics
+            </div>
+            <div class="card-body d-flex flex-column gap-2">
+                <p class="small text-muted">
+                    Reset hit/miss/factory invocation counters. The entry list and registries are not affected.
+                </p>
+                <form asp-controller="Tools" asp-action="ResetStatistics" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-outline-info w-100"
+                            data-bs-toggle="tooltip" title="Reset all hit/miss/factory counters to zero">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>Reset Statistics
+                    </button>
+                </form>
+                <form asp-controller="Tools" asp-action="LogState" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-outline-secondary w-100"
+                            data-bs-toggle="tooltip" title="Write current cache state to application log">
+                        <i class="bi bi-journal-text me-1"></i>Dump State to Log
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Maintenance -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header fw-semibold">
+                <i class="bi bi-broom me-1"></i>Maintenance
+            </div>
+            <div class="card-body d-flex flex-column gap-2">
+                <p class="small text-muted">
+                    Manually prune metadata entries whose TTL has elapsed.
+                    This happens automatically on every dashboard load.
+                </p>
+                <form asp-controller="Tools" asp-action="PruneExpired" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-outline-secondary w-100"
+                            data-bs-toggle="tooltip" title="Remove expired entries from metadata tracking">
+                        <i class="bi bi-trash3 me-1"></i>Prune Expired Metadata
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pressure Simulation -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header fw-semibold">
+                <i class="bi bi-speedometer me-1"></i>Pressure Simulation
+            </div>
+            <div class="card-body">
+                <p class="small text-muted">Quickly seed the cache with N factory-generated entries for load testing.</p>
+                <form asp-controller="Tools" asp-action="SimulatePressure" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="input-group mb-2">
+                        <span class="input-group-text small">Prefix</span>
+                        <input type="text" name="keyPrefix" class="form-control" value="pressure" />
+                    </div>
+                    <div class="input-group mb-3">
+                        <span class="input-group-text small">Count</span>
+                        <input type="number" name="entryCount" class="form-control" value="50" min="1" max="500" />
+                    </div>
+                    <button type="submit" class="btn btn-outline-danger w-100"
+                            data-bs-toggle="tooltip" title="Generate and store multiple entries for load testing">
+                        <i class="bi bi-lightning-charge me-1"></i>Run Pressure Simulation
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Snapshot & Logs -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header fw-semibold">
+                <i class="bi bi-file-earmark-zip me-1"></i>Export &amp; Logs
+            </div>
+            <div class="card-body d-flex flex-wrap gap-2">
+                <a asp-controller="Tools" asp-action="ExportSnapshot" class="btn btn-outline-success"
+                   data-bs-toggle="tooltip" title="Download current cache state as JSON">
+                    <i class="bi bi-download me-1"></i>Export Cache Snapshot (JSON)
+                </a>
+                <a asp-controller="Tools" asp-action="Logs" class="btn btn-outline-secondary"
+                   data-bs-toggle="tooltip" title="View real-time application logs">
+                    <i class="bi bi-terminal me-1"></i>View Session Log
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifications -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+                <span><i class="bi bi-bell me-1"></i>Recent Notifications</span>
+                <button id="btnMarkRead" class="btn btn-sm btn-outline-secondary"
+                        data-bs-toggle="tooltip" title="Mark all notifications as read">
+                    Mark all read
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div id="notifList" class="list-group list-group-flush rounded-bottom" style="max-height:300px;overflow-y:auto;">
+                    <div class="list-group-item text-muted small">Loading…</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+@section Scripts {
+<script>
+// ── Initialize Bootstrap tooltips ──────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+
+async function loadNotifications() {
+    try {
+        var resp = await fetch('@Url.Action("NotificationsData", "Tools")?count=30');
+        var data = await resp.json();
+        var list = document.getElementById('notifList');
+        if (!data.entries.length) {
+            list.innerHTML = '<div class="list-group-item text-muted small">No notifications yet.</div>';
+            return;
+        }
+        list.innerHTML = data.entries.map(function(n) {
+            return '<div class="list-group-item list-group-item-action' + (n.isRead ? '' : ' fw-semibold') + '">' +
+                '<div class="d-flex justify-content-between align-items-start">' +
+                    '<div>' +
+                        '<span class="badge ' + n.badgeClass + ' me-2">' + n.level + '</span>' +
+                        n.title +
+                    '</div>' +
+                    '<small class="text-muted ms-2 text-nowrap">' + n.timestamp + '</small>' +
+                '</div>' +
+                '<div class="small text-muted mt-1">' + n.message + '</div>' +
+            '</div>';
+        }).join('');
+    } catch(e) { console.error(e); }
+}
+
+document.getElementById('btnMarkRead').addEventListener('click', async function() {
+    var token = document.querySelector('input[name="__RequestVerificationToken"]');
+    if (!token) {
+        // Create a temporary form to get the token
+        var tempForm = document.createElement('form');
+        document.body.appendChild(tempForm);
+        @Html.AntiForgeryToken()
+        token = document.querySelector('input[name="__RequestVerificationToken"]');
+        document.body.removeChild(tempForm);
+    }
+    try {
+        await fetch('@Url.Action("MarkNotificationsRead", "Tools")', {
+            method: 'POST',
+            headers: { 'RequestVerificationToken': document.querySelector('[name=__RequestVerificationToken]')?.value ?? '' }
+        });
+        loadNotifications();
+    } catch(e) {}
+});
+
+loadNotifications();
+setInterval(loadNotifications, 10000);
+</script>
+
+<!-- Hidden antiforgery token for fetch calls -->
+<form id="hiddenAntiForgery" style="display:none">@Html.AntiForgeryToken()</form>
+}

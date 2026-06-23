@@ -1,0 +1,624 @@
+@model HybridCachePlayground.Web.Models.DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Cache Dashboard</h2>
+        <small class="text-muted">
+            <i class="bi bi-server me-1"></i>@Model.Instance?.Id
+            <span class="text-muted mx-1">·</span>
+            <i class="bi bi-pc-display me-1"></i>@Model.Instance?.MachineName
+        </small>
+    </div>
+    <div class="d-flex align-items-center gap-3">
+        <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="autoRefreshToggle" />
+            <label class="form-check-label small text-muted" for="autoRefreshToggle">
+                Auto-refresh (5s)<span id="autoRefreshDot" class="d-none"></span>
+            </label>
+        </div>
+        <a asp-controller="Home" asp-action="Index" class="btn btn-sm btn-outline-secondary" 
+           data-bs-toggle="tooltip" title="Refresh dashboard and statistics">
+            <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+        </a>
+    </div>
+</div>
+
+<!-- ── Stats cards ──────────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-4 col-lg-2">
+        <div class="card text-bg-primary h-100">
+            <div class="card-body text-center py-3">
+                <div class="fs-2 fw-bold">@Model.Stats.ActiveEntries</div>
+                <div class="small">Active Entries</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-4 col-lg-2">
+        <div class="card text-bg-success h-100">
+            <div class="card-body text-center py-3">
+                <div class="fs-2 fw-bold">@Model.Stats.Hits</div>
+                <div class="small">Cache Hits</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-4 col-lg-2">
+        <div class="card text-bg-danger h-100">
+            <div class="card-body text-center py-3">
+                <div class="fs-2 fw-bold">@Model.Stats.Misses</div>
+                <div class="small">Cache Misses</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-4 col-lg-2">
+        <div class="card text-bg-secondary h-100">
+            <div class="card-body text-center py-3">
+                <div class="fs-2 fw-bold">@Model.Stats.HitRatio%</div>
+                <div class="small">Hit Ratio</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-4 col-lg-2">
+        <div class="card text-bg-dark h-100">
+            <div class="card-body text-center py-3">
+                <div class="fs-2 fw-bold">@Model.Stats.TotalUniqueKeys</div>
+                <div class="small">Unique Keys (all-time)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-4 col-lg-2">
+        <div class="card h-100" style="background:#6f42c1;">
+            <div class="card-body text-center py-3" style="color:#fff;">
+                <div class="fs-2 fw-bold">@Model.Stats.TotalUniqueTags</div>
+                <div class="small">Unique Tags (all-time)</div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row g-3 mb-4">
+    <div class="col-sm-4 col-lg-3">
+        <div class="card border-warning h-100">
+            <div class="card-body text-center py-2">
+                <div class="fs-4 fw-bold text-warning">@Model.Stats.FactoryInvocations</div>
+                <div class="small text-muted">Factory Invocations</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-4 col-lg-3">
+        <div class="card border-info h-100">
+            <div class="card-body text-center py-2">
+                <div class="fs-4 fw-bold" style="color:#0dcaf0;">
+                    @Model.TotalNotifications
+                    @if (Model.UnreadNotifications > 0)
+                    {
+                        <span class="badge bg-danger ms-1 fs-6" style="font-size:.7rem !important;">@Model.UnreadNotifications new</span>
+                    }
+                </div>
+                <div class="small text-muted">
+                    Notifications
+                    <a asp-controller="Tools" asp-action="Index" class="ms-1 small">view</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Quick actions ────────────────────────────────────────────────────── -->
+<div class="mb-4">
+    <div class="d-flex gap-2 flex-wrap mb-2">
+        <a asp-controller="Cache" asp-action="Set"          class="btn btn-primary"
+           data-bs-toggle="tooltip" title="Add a new cache entry with custom key, value, and tags">
+            <i class="bi bi-plus-circle me-1"></i>Set Entry
+        </a>
+        <a asp-controller="Cache" asp-action="BulkSet"      class="btn btn-primary"
+           data-bs-toggle="tooltip" title="Generate and store multiple cache entries at once">
+            <i class="bi bi-boxes me-1"></i>Bulk Add
+        </a>
+        <a asp-controller="Cache" asp-action="Get"          class="btn btn-outline-primary"
+           data-bs-toggle="tooltip" title="Retrieve a cache entry by key or trigger factory on miss">
+            <i class="bi bi-search me-1"></i>Get Entry
+        </a>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a asp-controller="Cache" asp-action="Remove"       class="btn btn-outline-danger"
+           data-bs-toggle="tooltip" title="Remove cache entries by key (single or bulk)">
+            <i class="bi bi-key me-1"></i>Remove Keys
+        </a>
+        <a asp-controller="Cache" asp-action="RemoveByTag"  class="btn btn-outline-danger"
+           data-bs-toggle="tooltip" title="Invalidate cache entries by tag (logical deletion)">
+            <i class="bi bi-tags me-1"></i>Remove by Tags
+        </a>
+    </div>
+</div>
+
+<!-- ── Active entries ───────────────────────────────────────────────────── -->
+<h5 class="mb-2">Active Cache Entries</h5>
+@if (!Model.Entries.Any())
+{
+    <div class="card border-secondary mb-4">
+        <div class="card-body text-center py-3 text-muted">
+            No active entries.
+            <a asp-controller="Cache" asp-action="Set">Set one</a> or
+            <a asp-controller="Cache" asp-action="Get">Get a key</a> to trigger the random factory.
+        </div>
+    </div>
+}
+else
+{
+    <!-- Bulk delete toolbar -->
+    <div id="bulkToolbar" class="d-none mb-2 d-flex align-items-center gap-2">
+        <span class="small text-muted"><span id="selectedCount">0</span> selected</span>
+        <form asp-controller="Home" asp-action="BulkRemove" method="post" id="bulkRemoveForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="keys" id="selectedKeys" />
+            <button type="submit" class="btn btn-sm btn-outline-danger"
+                    data-bs-toggle="tooltip" title="Remove all selected cache entries">
+                <i class="bi bi-trash3 me-1"></i>Delete Selected
+            </button>
+        </form>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearSel"
+                data-bs-toggle="tooltip" title="Deselect all entries">Clear selection</button>
+    </div>
+
+    <div class="table-responsive mb-4">
+        <table class="table table-bordered table-hover align-middle mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th style="width:36px"><input type="checkbox" id="selectAllKeys" class="form-check-input" /></th>
+                    <th>Key</th>
+                    <th>Value</th>
+                    <th style="width:60px" class="text-center">Tags #</th>
+                    <th>Tags</th>
+                    <th class="text-nowrap">Source</th>
+                    <th class="text-nowrap">Created</th>
+                    <th class="text-nowrap">Expires In</th>
+                    <th class="text-nowrap">Last Hit</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var entry in Model.Entries)
+                {
+                    var collapseId = $"val-{entry.Key.GetHashCode():X}";
+                    <tr class="entry-row @(entry.IsExpired ? "expired-row" : "")" data-key="@entry.Key">
+                        <td><input type="checkbox" class="form-check-input entry-cb" value="@entry.Key" /></td>
+                        <td><code class="small">@entry.Key</code></td>
+                        <td style="max-width:220px">
+                            <div class="d-flex gap-1">
+                                <button class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                        type="button" data-bs-toggle="collapse"
+                                        data-bs-target="#@collapseId"
+                                        title="Expand to view full value">
+                                    <small>View</small>
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                        type="button"
+                                        onclick="copyPreText('@collapseId', this)"
+                                        title="Copy value to clipboard">
+                                    <small>Copy</small>
+                                </button>
+                            </div>
+                            <div class="collapse" id="@collapseId">
+                                <pre class="value-preview mb-0 mt-1 small">@entry.Value</pre>
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge text-bg-secondary">@entry.Tags.Count</span>
+                        </td>
+                        <td>
+                            @foreach (var tag in entry.Tags)
+                            {
+                                <span class="badge text-bg-info badge-tag me-1">@tag</span>
+                            }
+                        </td>
+                        <td class="text-nowrap small">
+                            @if (entry.FactoryGenerated)
+                            {
+                                <span class="badge text-bg-warning">factory · @entry.FactoryLabel</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">manual</span>
+                            }
+                        </td>
+                        <td class="text-nowrap small">@entry.CreatedAt.ToLocalTime().ToString("HH:mm:ss")</td>
+                        <td class="text-nowrap small @(entry.IsExpired ? "text-danger" : "text-success")">
+                            @entry.ExpiresIn
+                        </td>
+                        <td class="text-nowrap small">
+                            @(entry.LastAccessedAt.HasValue
+                                ? entry.LastAccessedAt.Value.ToLocalTime().ToString("HH:mm:ss")
+                                : "—")
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-secondary me-1 btn-inspect"
+                                    data-key="@entry.Key" 
+                                    data-bs-toggle="tooltip" title="Inspect entry details with live TTL countdown">
+                                <i class="bi bi-zoom-in"></i>
+                            </button>
+                            <form asp-controller="Home" asp-action="QuickRemove" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="key" value="@entry.Key" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger"
+                                        data-bs-toggle="tooltip" title="Remove this entry from cache">
+                                    <i class="bi bi-trash me-1"></i>Remove
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<!-- Entry Inspector Offcanvas -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="entryInspector" style="width:420px;background:#161b22;border-left:1px solid #30363d;">
+    <div class="offcanvas-header border-bottom" style="border-color:#30363d!important;">
+        <h6 class="offcanvas-title fw-semibold">
+            <i class="bi bi-zoom-in me-2"></i>Entry Inspector
+        </h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body p-3" id="inspectorBody">
+        <div class="text-muted small text-center mt-5">Select an entry to inspect.</div>
+    </div>
+</div>
+
+<!-- ── Key Registry ──────────────────────────────────────────────────────── -->
+<h5 class="mb-2 mt-4">
+    Key Registry
+    <span class="badge text-bg-dark ms-1">@Model.KeyRegistry.Count</span>
+    <small class="text-muted fw-normal fs-6">— all keys ever used in this session</small>
+</h5>
+@if (!Model.KeyRegistry.Any())
+{
+    <p class="text-muted small">No keys recorded yet.</p>
+}
+else
+{
+    <div class="table-responsive mb-4">
+        <table class="table table-sm table-bordered align-middle mb-0">
+            <thead class="table-secondary">
+                <tr>
+                    <th>Key</th>
+                    <th class="text-center">Times Set</th>
+                    <th class="text-center">Hits</th>
+                    <th class="text-center">Misses</th>
+                    <th class="text-center">Hit %</th>
+                    <th>Last Known Tags</th>
+                    <th class="text-nowrap">First Seen</th>
+                    <th class="text-nowrap">Last Seen</th>
+                    <th class="text-center">Active</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var k in Model.KeyRegistry)
+                {
+                    <tr>
+                        <td><code class="small">@k.Key</code></td>
+                        <td class="text-center">@k.TimesSet</td>
+                        <td class="text-center text-success fw-semibold">@k.Hits</td>
+                        <td class="text-center text-danger fw-semibold">@k.Misses</td>
+                        <td class="text-center">
+                            <span class="badge @(k.HitRatio >= 50 ? "text-bg-success" : "text-bg-danger")">
+                                @k.HitRatio%
+                            </span>
+                        </td>
+                        <td>
+                            @foreach (var tag in k.LastKnownTags)
+                            {
+                                <span class="badge text-bg-info badge-tag me-1">@tag</span>
+                            }
+                        </td>
+                        <td class="text-nowrap small">@k.FirstSeen.ToLocalTime().ToString("HH:mm:ss")</td>
+                        <td class="text-nowrap small">@k.LastSeen.ToLocalTime().ToString("HH:mm:ss")</td>
+                        <td class="text-center">
+                            @if (k.IsCurrentlyActive)
+                            {
+                                <span class="badge text-bg-success">yes</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">no</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<!-- ── Tag Registry ──────────────────────────────────────────────────────── -->
+<h5 class="mb-2 mt-4">
+    Tag Registry
+    <span class="badge text-bg-dark ms-1">@Model.TagRegistry.Count</span>
+    <small class="text-muted fw-normal fs-6">— all tags ever used in this session</small>
+</h5>
+@if (!Model.TagRegistry.Any())
+{
+    <p class="text-muted small">No tags recorded yet.</p>
+}
+else
+{
+    <div class="table-responsive mb-4">
+        <table class="table table-sm table-bordered align-middle mb-0">
+            <thead class="table-secondary">
+                <tr>
+                    <th>Tag</th>
+                    <th class="text-center">Times Used</th>
+                    <th class="text-center">Active Entries</th>
+                    <th>Associated Keys</th>
+                    <th class="text-nowrap">First Seen</th>
+                    <th class="text-nowrap">Last Seen</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var t in Model.TagRegistry)
+                {
+                    <tr>
+                        <td><span class="badge text-bg-info">@t.Tag</span></td>
+                        <td class="text-center">@t.TimesUsed</td>
+                        <td class="text-center">
+                            <span class="badge @(t.ActiveEntries > 0 ? "text-bg-success" : "text-bg-secondary")">
+                                @t.ActiveEntries
+                            </span>
+                        </td>
+                        <td class="small">
+                            @string.Join(", ", t.KnownKeys.Take(5))
+                            @if (t.KnownKeys.Count > 5)
+                            {
+                                <span class="text-muted"> +@(t.KnownKeys.Count - 5) more</span>
+                            }
+                        </td>
+                        <td class="text-nowrap small">@t.FirstSeen.ToLocalTime().ToString("HH:mm:ss")</td>
+                        <td class="text-nowrap small">@t.LastSeen.ToLocalTime().ToString("HH:mm:ss")</td>
+                        <td>
+                            <a asp-controller="Cache" asp-action="RemoveByTag"
+                               class="btn btn-sm btn-outline-danger"
+                               data-bs-toggle="tooltip" title="Invalidate all entries with this tag">
+                                <i class="bi bi-trash me-1"></i>Evict
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@section Scripts {
+<script>
+// ── Initialize Bootstrap tooltips ──────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+
+// ── Copy value from a pre block ────────────────────────────────────────────
+function copyPreText(collapseId, btn) {
+    var pre = document.querySelector('#' + collapseId + ' pre');
+    if (!pre) return;
+    navigator.clipboard.writeText(pre.textContent).then(function () {
+        var orig = btn.innerHTML;
+        btn.innerHTML = '<small>Copied!</small>';
+        setTimeout(function () { btn.innerHTML = orig; }, 1500);
+    });
+}
+
+// ── Auto-refresh toggle ────────────────────────────────────────────────────
+var refreshTimer = null;
+var dot = document.getElementById('autoRefreshDot');
+
+document.getElementById('autoRefreshToggle').addEventListener('change', function () {
+    if (this.checked) {
+        dot.classList.remove('d-none');
+        refreshTimer = setInterval(function () { location.reload(); }, 5000);
+    } else {
+        dot.classList.add('d-none');
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+    }
+});
+
+// ── Entry Inspector ────────────────────────────────────────────────────────
+(function () {
+    var ttlInterval = null;
+    var currentExpiresInMs = 0;
+    var fetchedAt = 0;
+
+    function escHtml(s) {
+        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function fmtTtl(ms) {
+        if (ms <= 0) return '<span class="text-danger">Expired</span>';
+        var s = Math.floor(ms / 1000);
+        var m = Math.floor(s / 60);
+        var h = Math.floor(m / 60);
+        if (h > 0) return h + 'h ' + (m % 60) + 'm ' + (s % 60) + 's';
+        if (m > 0) return m + 'm ' + (s % 60) + 's';
+        return s + 's';
+    }
+
+    function renderInspector(d) {
+        currentExpiresInMs = d.expiresInMs || 0;
+        fetchedAt = Date.now();
+
+        var totalHitMiss = (d.hits || 0) + (d.misses || 0);
+        var hitPct = totalHitMiss > 0 ? Math.round((d.hits / totalHitMiss) * 100) : 0;
+        var hitBarColor = hitPct >= 50 ? '#198754' : '#dc3545';
+
+        var html = '<div class="mb-3">';
+        html += '<div class="small text-muted mb-1">Key</div>';
+        html += '<code class="small" style="word-break:break-all;">' + escHtml(d.key) + '</code>';
+        html += '</div>';
+
+        // Status + TTL
+        html += '<div class="mb-3 d-flex gap-2 align-items-center">';
+        if (d.isExpired) {
+            html += '<span class="badge text-bg-danger">Expired</span>';
+        } else {
+            html += '<span class="badge text-bg-success">Active</span>';
+        }
+        if (d.factoryGenerated) {
+            html += '<span class="badge text-bg-warning">factory · ' + escHtml(d.factoryLabel) + '</span>';
+        }
+        html += '</div>';
+
+        // TTL countdown
+        html += '<div class="mb-3 p-2 rounded" style="background:#0d1117;border:1px solid #2d3139;">';
+        html += '<div class="small text-muted mb-1">TTL Remaining</div>';
+        html += '<div id="ttlCountdown" class="fw-semibold" style="font-size:1.1rem;">' + fmtTtl(currentExpiresInMs) + '</div>';
+        html += '<div class="small text-muted mt-1">Expires: ' + escHtml(d.expiresAt) + '</div>';
+        html += '</div>';
+
+        // Hit/Miss bar
+        if (totalHitMiss > 0) {
+            html += '<div class="mb-3">';
+            html += '<div class="small text-muted mb-1">Hit / Miss Ratio</div>';
+            html += '<div class="progress" style="height:8px;background:#2d3139;">';
+            html += '<div class="progress-bar" style="width:' + hitPct + '%;background:' + hitBarColor + ';" title="' + hitPct + '% hits"></div>';
+            html += '</div>';
+            html += '<div class="d-flex justify-content-between small mt-1">';
+            html += '<span class="text-success">' + d.hits + ' hits (' + hitPct + '%)</span>';
+            html += '<span class="text-danger">' + d.misses + ' misses</span>';
+            html += '</div>';
+            html += '</div>';
+        }
+
+        // Stats row
+        html += '<div class="row g-2 mb-3 text-center">';
+        html += '<div class="col-3"><div class="small text-muted">Hits</div><div class="fw-bold text-success">' + (d.hits || 0) + '</div></div>';
+        html += '<div class="col-3"><div class="small text-muted">Misses</div><div class="fw-bold text-danger">' + (d.misses || 0) + '</div></div>';
+        html += '<div class="col-3"><div class="small text-muted">Hit %</div><div class="fw-bold">' + hitPct + '%</div></div>';
+        html += '<div class="col-3"><div class="small text-muted">Set #</div><div class="fw-bold">' + (d.timesSet || 0) + '</div></div>';
+        html += '</div>';
+
+        // Tags
+        if (d.tags && d.tags.length > 0) {
+            html += '<div class="mb-3">';
+            html += '<div class="small text-muted mb-1">Tags</div>';
+            d.tags.forEach(function(t) {
+                html += '<span class="badge text-bg-info badge-tag me-1">' + escHtml(t) + '</span>';
+            });
+            html += '</div>';
+        }
+
+        // Timestamps
+        html += '<div class="mb-3 small">';
+        html += '<div class="text-muted">Created: <span class="text-light">' + escHtml(d.createdAt) + '</span></div>';
+        if (d.lastAccessedAt) {
+            html += '<div class="text-muted">Last Hit: <span class="text-light">' + escHtml(d.lastAccessedAt) + '</span></div>';
+        }
+        if (d.firstSeen) {
+            html += '<div class="text-muted">First Seen: <span class="text-light">' + escHtml(d.firstSeen) + '</span></div>';
+        }
+        html += '</div>';
+
+        // Value
+        if (d.value) {
+            html += '<div class="mb-2">';
+            html += '<div class="small text-muted mb-1">Value</div>';
+            html += '<pre class="value-preview small mb-0">' + escHtml(d.value) + '</pre>';
+            html += '</div>';
+        }
+
+        document.getElementById('inspectorBody').innerHTML = html;
+
+        // Start TTL countdown
+        if (ttlInterval) clearInterval(ttlInterval);
+        if (!d.isExpired && currentExpiresInMs > 0) {
+            ttlInterval = setInterval(function () {
+                var elapsed = Date.now() - fetchedAt;
+                var remaining = currentExpiresInMs - elapsed;
+                var el = document.getElementById('ttlCountdown');
+                if (el) el.innerHTML = fmtTtl(remaining);
+                if (remaining <= 0 && ttlInterval) {
+                    clearInterval(ttlInterval);
+                    ttlInterval = null;
+                }
+            }, 1000);
+        }
+    }
+
+    document.querySelectorAll('.btn-inspect').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var key = btn.getAttribute('data-key');
+            var offcanvasEl = document.getElementById('entryInspector');
+            bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl).show();
+            document.getElementById('inspectorBody').innerHTML = '<div class="text-muted small text-center mt-5">Loading…</div>';
+            fetch('/Home/EntryDetail?key=' + encodeURIComponent(key))
+                .then(function (r) {
+                    if (!r.ok) throw new Error('Not found');
+                    return r.json();
+                })
+                .then(renderInspector)
+                .catch(function () {
+                    document.getElementById('inspectorBody').innerHTML = '<div class="text-danger small text-center mt-5">Failed to load entry.</div>';
+                });
+        });
+    });
+
+    document.getElementById('entryInspector').addEventListener('hide.bs.offcanvas', function () {
+        if (ttlInterval) { clearInterval(ttlInterval); ttlInterval = null; }
+    });
+})();
+
+// ── Bulk selection ─────────────────────────────────────────────────────────
+(function () {
+    var selectAll = document.getElementById('selectAllKeys');
+    var toolbar   = document.getElementById('bulkToolbar');
+    var countEl   = document.getElementById('selectedCount');
+    var keysInput = document.getElementById('selectedKeys');
+    var clearBtn  = document.getElementById('btnClearSel');
+
+    if (!selectAll) return; // no entries
+
+    function updateToolbar() {
+        var checked = document.querySelectorAll('.entry-cb:checked');
+        var count = checked.length;
+        countEl.textContent = count;
+        if (count > 0) {
+            toolbar.classList.remove('d-none');
+            toolbar.classList.add('d-flex');
+            keysInput.value = Array.from(checked).map(function (c) { return c.value; }).join(',');
+        } else {
+            toolbar.classList.add('d-none');
+            toolbar.classList.remove('d-flex');
+            keysInput.value = '';
+        }
+    }
+
+    selectAll.addEventListener('change', function () {
+        document.querySelectorAll('.entry-cb').forEach(function (cb) {
+            cb.checked = selectAll.checked;
+        });
+        updateToolbar();
+    });
+
+    document.querySelectorAll('.entry-cb').forEach(function (cb) {
+        cb.addEventListener('change', function () {
+            var all = document.querySelectorAll('.entry-cb');
+            var allChecked = Array.from(all).every(function (c) { return c.checked; });
+            selectAll.checked = allChecked;
+            updateToolbar();
+        });
+    });
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+            selectAll.checked = false;
+            document.querySelectorAll('.entry-cb').forEach(function (cb) { cb.checked = false; });
+            updateToolbar();
+        });
+    }
+})();
+</script>
+}

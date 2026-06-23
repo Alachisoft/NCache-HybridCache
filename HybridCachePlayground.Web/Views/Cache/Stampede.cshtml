@@ -1,0 +1,209 @@
+@using HybridCachePlayground.Web.Models
+@model HybridCachePlayground.Web.Models.StampedeRequest
+@{
+    ViewData["Title"] = "Stampede Test";
+    var result      = ViewData["Result"] as StampedeResult;
+    var maxConc     = (int)(ViewData["StampedeMax"] ?? 200);
+    var recentKeys  = ViewData["RecentKeys"] as List<string> ?? new();
+}
+
+<h2 class="mb-1">Stampede Protection Test</h2>
+<p class="text-muted mb-4">
+    Fires <em>N</em> concurrent <code>GetOrCreateAsync</code> requests for the same key simultaneously.
+    HybridCache coalesces them — the factory should run <strong>exactly once</strong> regardless of N.
+</p>
+
+<div class="row g-4">
+    <!-- ── Form ── -->
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header fw-semibold">Test Configuration</div>
+            <div class="card-body">
+                <form asp-action="Stampede" method="post">
+                    @Html.AntiForgeryToken()
+
+                    <div class="mb-3">
+                        <label asp-for="Key" class="form-label fw-semibold">Cache Key</label>
+                        <input asp-for="Key" id="Key" class="form-control" placeholder="stampede-test" />
+                        <span asp-validation-for="Key" class="text-danger small"></span>
+                        @if (recentKeys.Any())
+                        {
+                            <div class="mt-1">
+                                <small class="text-muted">Recent: </small>
+                                @foreach (var k in recentKeys)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary chip-suggest"
+                                            data-fill-id="Key" data-fill-val="@k">@k</button>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Concurrency" class="form-label fw-semibold">
+                            Concurrent Requests
+                            <span class="text-muted fw-normal">(2–@maxConc)</span>
+                        </label>
+                        <input asp-for="Concurrency" type="number" class="form-control"
+                               min="2" max="@maxConc" />
+                        <span asp-validation-for="Concurrency" class="text-danger small"></span>
+                        <div class="form-text">
+                            All requests are fired simultaneously via <code>Task.WhenAll</code>.
+                            Max concurrency is configurable via <code>HybridCache:StampedeMaxConcurrency</code>.
+                        </div>
+                    </div>
+
+                    <div class="mb-4 form-check">
+                        <input asp-for="ForceEvict" type="checkbox" class="form-check-input" />
+                        <label asp-for="ForceEvict" class="form-check-label">
+                            Evict key before test <span class="text-muted small">(guarantees a cold cache miss)</span>
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">Run Stampede Test</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card border-info mt-3">
+            <div class="card-header bg-info small">How stampede protection works</div>
+            <div class="card-body small">
+                <p>
+                    Without stampede protection, if 50 requests arrive for the same uncached key
+                    simultaneously, all 50 see a miss and invoke the factory —
+                    <strong>50 redundant backend calls</strong>.
+                </p>
+                <p class="mb-0">
+                    <code>HybridCache</code> uses an internal lock per key. The first caller gets the lock
+                    and runs the factory; all other callers <em>await the same result</em>. Factory runs
+                    <strong>exactly once</strong>, regardless of the backend or concurrency level.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Results ── -->
+    <div class="col-md-7">
+        @if (result is not null)
+        {
+            var cardClass   = result.FactoryInvocations == 0 ? "border-warning"
+                            : result.StampedeProtectionWorked ? "border-success"
+                            : "border-danger";
+            var headerClass = result.FactoryInvocations == 0 ? "bg-warning text-dark"
+                            : result.StampedeProtectionWorked ? "bg-success text-white"
+                            : "bg-danger text-white";
+
+            <div class="card @cardClass mb-3">
+                <div class="card-header @headerClass fw-semibold">
+                    @if (result.FactoryInvocations == 0)
+                    {
+                        <text>All HITs — key was already cached</text>
+                    }
+                    else if (result.StampedeProtectionWorked)
+                    {
+                        <text>Stampede protection confirmed</text>
+                    }
+                    else
+                    {
+                        <text>Factory ran multiple times</text>
+                    }
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 text-center mb-3">
+                        <div class="col-4">
+                            <div class="fs-1 fw-bold text-primary">@result.RequestCount</div>
+                            <div class="small text-muted">Concurrent Requests</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="fs-1 fw-bold @(result.StampedeProtectionWorked ? "text-success" : result.FactoryInvocations == 0 ? "text-warning" : "text-danger")">
+                                @result.FactoryInvocations
+                            </div>
+                            <div class="small text-muted">Factory Ran</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="fs-1 fw-bold text-secondary">@result.ElapsedMs<span class="fs-6">ms</span></div>
+                            <div class="small text-muted">Total Time</div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 text-center mb-3">
+                        <div class="col-6">
+                            <div class="fs-4 fw-bold text-success">@result.SuccessfulResponses</div>
+                            <div class="small text-muted">Successful Responses</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="fs-4 fw-bold">@(result.RequestCount - result.SuccessfulResponses)</div>
+                            <div class="small text-muted">Failed / Null</div>
+                        </div>
+                    </div>
+
+                    <div class="alert @(result.StampedeProtectionWorked ? "alert-success" : result.FactoryInvocations == 0 ? "alert-warning" : "alert-danger") mb-3 py-2">
+                        @result.Verdict
+                    </div>
+
+                    @if (result.SampleValue is not null)
+                    {
+                        <div class="mt-2">
+                            <div class="small fw-semibold text-muted mb-1">Value returned to all @result.SuccessfulResponses callers:</div>
+                            <pre class="value-preview small mb-0">@result.SampleValue</pre>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Visual timeline -->
+            <div class="card">
+                <div class="card-header small fw-semibold">Request Timeline (conceptual)</div>
+                <div class="card-body p-2">
+                    <div class="position-relative" style="height:60px; background:#0d1117; border-radius:4px; overflow:hidden; padding:8px; border:1px solid #2d3139;">
+                        @{
+                            var barCount = Math.Min(result.RequestCount, 40);
+                            var barWidth = Math.Max(1, (int)(100.0 / barCount)) + "%";
+                        }
+                        @for (int i = 0; i < barCount; i++)
+                        {
+                            var isFactory = i == 0 && result.FactoryInvocations > 0;
+                            var color = isFactory ? "#198754" : "#0d6efd";
+                            var label = isFactory ? "factory" : "await";
+                            <div class="d-inline-block me-1 text-center" title="@label"
+                                 style="width:@barWidth; background:@color; height:40px; border-radius:3px; vertical-align:top;">
+                            </div>
+                        }
+                        @if (result.RequestCount > 40)
+                        {
+                            <div class="small text-muted mt-1">… showing first 40 of @result.RequestCount requests</div>
+                        }
+                    </div>
+                    <div class="small text-muted mt-1">
+                        <span class="badge" style="background:#198754">factory</span> ran the factory
+                        &nbsp;
+                        <span class="badge" style="background:#0d6efd">await</span> waited for the result
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card h-100" style="border-color:#2d3139;">
+                <div class="card-body d-flex align-items-center justify-content-center text-muted">
+                    <div class="text-center">
+                        <div class="fs-1 mb-2">&#9889;</div>
+                        <p>Configure and run the test to see results here.</p>
+                        <p class="small mb-0">Try concurrency = 20 with <em>Force Evict</em> enabled.</p>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+    document.querySelectorAll('[data-fill-id]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.getElementById(btn.getAttribute('data-fill-id')).value = btn.getAttribute('data-fill-val');
+        });
+    });
+    </script>
+}

@@ -1,0 +1,313 @@
+@using HybridCachePlayground.Web.Models
+@model HybridCachePlayground.Web.Models.CacheGetRequest
+@{
+    ViewData["Title"] = "Get Cache Entry";
+    var result     = ViewData["Result"] as CacheGetResult;
+    var recentKeys = ViewData["RecentKeys"] as List<string> ?? new();
+}
+
+<h2 class="mb-4">Get Cache Entry</h2>
+<p class="text-muted">
+    Retrieves a value using
+    <code>HybridCache.GetOrCreateAsync(key, factory, options)</code>.
+    If the key is not in cache, the factory runs (miss).
+</p>
+
+<div class="row">
+    <div class="col-md-7">
+        <form asp-action="Get" method="post">
+            @Html.AntiForgeryToken()
+
+            <!-- Key -->
+            <div class="mb-3">
+                <label asp-for="Key" class="form-label fw-semibold">Cache Key</label>
+                <input asp-for="Key" id="Key" class="form-control" placeholder="e.g. user:42" />
+                <span asp-validation-for="Key" class="text-danger small"></span>
+                @if (recentKeys.Any())
+                {
+                    <div class="mt-1">
+                        <small class="text-muted">Recent: </small>
+                        @foreach (var k in recentKeys)
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-secondary chip-suggest"
+                                    data-fill-id="Key" data-fill-val="@k">@k</button>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- Factory Template -->
+            <div class="mb-3">
+                <label class="form-label fw-semibold">
+                    Factory Template <span class="text-muted fw-normal">(used on cache miss)</span>
+                </label>
+                <input asp-for="FactoryTemplateIndex" type="hidden" id="FactoryTemplateIndex" />
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary tpl-btn active" data-tpl="-1">
+                        <i class="bi bi-shuffle me-1"></i>Random
+                    </button>
+                    @for (var i = 0; i < HybridCachePlayground.Web.Services.RandomDataFactory.Templates.Length; i++)
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary tpl-btn" data-tpl="@i">
+                            @HybridCachePlayground.Web.Services.RandomDataFactory.Templates[i].Label
+                        </button>
+                    }
+                </div>
+                <div class="form-text mb-2">Click a template to generate a preview. Edit before submitting if needed.</div>
+            </div>
+
+            <!-- Factory Value Preview (editable) -->
+            <div class="mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label asp-for="FactoryValue" class="form-label fw-semibold mb-0">
+                        Factory Value <span class="text-muted fw-normal small">(editable preview — blank = auto-generate on miss)</span>
+                    </label>
+                    <button type="button" id="btnRegenerate" class="btn btn-sm btn-outline-secondary d-none">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Regenerate
+                    </button>
+                </div>
+                <textarea asp-for="FactoryValue" id="FactoryValue" class="form-control font-monospace"
+                          rows="6" placeholder="Leave blank to auto-generate on cache miss, or click a template above to preview and optionally edit the data."></textarea>
+            </div>
+
+            <!-- Tags for factory miss -->
+            <div class="mb-3">
+                <label asp-for="TagsRaw" class="form-label fw-semibold">
+                    Tags <span class="text-muted fw-normal small">(optional, comma-separated — applied when factory stores value on miss)</span>
+                </label>
+                <input asp-for="TagsRaw" id="TagsRaw" class="form-control" placeholder="e.g. user, identity, user-data (optional)" />
+                <div class="form-text">Auto-filled from template; edit freely or leave blank.</div>
+            </div>
+
+            <!-- HybridCacheEntryFlags -->
+            <div class="mb-4">
+                <label class="form-label fw-semibold">Cache Flags</label>
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <div class="border rounded p-2 flag-check d-flex align-items-start gap-2">
+                            <input class="form-check-input flex-shrink-0 mt-1" asp-for="DisableLocalCacheRead" id="DisableLocalCacheRead" />
+                            <label for="DisableLocalCacheRead" class="mb-0" style="cursor:pointer;">
+                                <span class="fw-semibold d-block small">Disable L1 Read</span>
+                                <span class="text-muted" style="font-size:.8rem">Skip in-process cache on read — always go to L2+factory.</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="border rounded p-2 flag-check d-flex align-items-start gap-2">
+                            <input class="form-check-input flex-shrink-0 mt-1" asp-for="DisableDistributedCacheRead" id="DisableDistributedCacheRead" />
+                            <label for="DisableDistributedCacheRead" class="mb-0" style="cursor:pointer;">
+                                <span class="fw-semibold d-block small">Disable L2 Read</span>
+                                <span class="text-muted" style="font-size:.8rem">Skip distributed cache on read — go straight to factory.</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="border rounded p-2 flag-check d-flex align-items-start gap-2">
+                            <input class="form-check-input flex-shrink-0 mt-1" asp-for="DisableLocalCacheWrite" id="DisableLocalCacheWrite" />
+                            <label for="DisableLocalCacheWrite" class="mb-0" style="cursor:pointer;">
+                                <span class="fw-semibold d-block small">Disable L1 Write</span>
+                                <span class="text-muted" style="font-size:.8rem">Don't populate in-process cache after factory runs.</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="border rounded p-2 flag-check d-flex align-items-start gap-2">
+                            <input class="form-check-input flex-shrink-0 mt-1" asp-for="DisableDistributedCacheWrite" id="DisableDistributedCacheWrite" />
+                            <label for="DisableDistributedCacheWrite" class="mb-0" style="cursor:pointer;">
+                                <span class="fw-semibold d-block small">Disable L2 Write</span>
+                                <span class="text-muted" style="font-size:.8rem">Don't write to distributed cache after factory runs.</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary"
+                    data-bs-toggle="tooltip" title="Retrieve from cache or invoke factory on miss">
+                <i class="bi bi-download me-1"></i>Get from Cache
+            </button>
+            <button type="button" id="btnClear" class="btn btn-outline-secondary"
+                    data-bs-toggle="tooltip" title="Clear all form fields">
+                <i class="bi bi-x-circle me-1"></i>Clear
+            </button>
+            <a asp-controller="Home" asp-action="Index" class="btn btn-link"
+               data-bs-toggle="tooltip" title="Return to the dashboard">
+                <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+            </a>
+        </form>
+
+        @if (result is not null)
+        {
+            <hr class="my-4" style="border-color:#2d3139;" />
+            @if (result.IsHit)
+            {
+                <div class="alert alert-success d-flex align-items-center gap-2">
+                    <span class="badge hit-badge fs-6 px-3 py-2">HIT</span>
+                    <span>Found in cache — factory was <strong>not</strong> called.</span>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-danger d-flex align-items-center gap-2">
+                    <span class="badge miss-badge fs-6 px-3 py-2">MISS</span>
+                    <span>
+                        Not found in cache — factory was called.
+                        @if (!result.HasResult)
+                        {
+                            <strong>No value returned (key was never set or has expired).</strong>
+                        }
+                        else if (result.FactoryLabel is not null)
+                        {
+                            <span>Generated: <strong>@result.FactoryLabel</strong></span>
+                        }
+                    </span>
+                </div>
+            }
+
+            @if (result.HasResult)
+            {
+                <div class="card mt-3">
+                    <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+                        <span>Value for <code>@result.Key</code></span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                onclick="copyText(this, '@result.Key')">Copy</button>
+                    </div>
+                    <div class="card-body">
+                        <pre class="value-preview mb-0" id="val-@result.Key.GetHashCode()">@result.Value</pre>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header bg-secondary small">API used</div>
+            <div class="card-body">
+                <pre class="small mb-0"><code>var value = await hybridCache
+    .GetOrCreateAsync(
+        key,
+        async ct =>
+        {
+            // factory: called on MISS only
+            // stampede-safe (only runs once
+            // even under concurrent requests)
+            return await FetchFromDb(ct);
+        },
+        new HybridCacheEntryOptions
+        {
+            Flags = HybridCacheEntryFlags
+                .DisableLocalCacheRead
+        });</code></pre>
+            </div>
+        </div>
+        <div class="card border-info mt-3">
+            <div class="card-header bg-info small">Stampede protection</div>
+            <div class="card-body small">
+                HybridCache serialises concurrent requests for the
+                same key — the factory runs only <strong>once</strong>,
+                even if 100 requests arrive simultaneously.
+            </div>
+        </div>
+        <div class="card mt-3">
+            <div class="card-header bg-secondary small">Flag quick reference</div>
+            <div class="card-body small">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        <tr><td><code>DisableLocalCacheRead</code></td><td>Always fetch from L2/factory</td></tr>
+                        <tr><td><code>DisableDistributedCacheRead</code></td><td>Bypass L2 on read</td></tr>
+                        <tr><td><code>DisableLocalCacheWrite</code></td><td>Don't cache in L1</td></tr>
+                        <tr><td><code>DisableDistributedCacheWrite</code></td><td>Don't cache in L2</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+    // ── Initialize Bootstrap tooltips ──────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function () {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+
+    // ── Recent key chips ──────────────────────────────────────────────────────
+    document.querySelectorAll('[data-fill-id]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.getElementById(btn.getAttribute('data-fill-id')).value = btn.getAttribute('data-fill-val');
+        });
+    });
+
+    // ── Template buttons ──────────────────────────────────────────────────────
+    var GENERATE_URL = '@Url.Action("GenerateValue", "Cache")';
+    var currentTpl = -1;
+
+    async function loadTemplate(tpl) {
+        currentTpl = tpl;
+        document.getElementById('FactoryTemplateIndex').value = tpl;
+        document.getElementById('btnRegenerate').classList.remove('d-none');
+
+        // Highlight active button
+        document.querySelectorAll('.tpl-btn').forEach(function(b) {
+            b.classList.toggle('active', parseInt(b.dataset.tpl) === tpl);
+        });
+
+        try {
+            var resp = await fetch(GENERATE_URL + '?templateIndex=' + tpl);
+            var data = await resp.json();
+            document.getElementById('FactoryValue').value = data.json;
+            document.getElementById('TagsRaw').value = (data.tags || []).join(', ');
+        } catch(e) {
+            console.error('Generate failed', e);
+        }
+    }
+
+    document.querySelectorAll('.tpl-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            loadTemplate(parseInt(btn.dataset.tpl));
+        });
+    });
+
+    document.getElementById('btnRegenerate').addEventListener('click', function() {
+        loadTemplate(currentTpl);
+    });
+
+    // ── Clear button ──────────────────────────────────────────────────────────
+    document.getElementById('btnClear').addEventListener('click', function() {
+        document.getElementById('Key').value          = '';
+        document.getElementById('FactoryValue').value = '';
+        document.getElementById('TagsRaw').value      = '';
+        document.getElementById('FactoryTemplateIndex').value = '-1';
+        document.getElementById('btnRegenerate').classList.add('d-none');
+        document.querySelectorAll('.tpl-btn').forEach(function(b) { b.classList.remove('active'); });
+        currentTpl = -1;
+    });
+
+    // ── Copy result ───────────────────────────────────────────────────────────
+    function copyText(btn, key) {
+        var preEl = document.getElementById('val-' + hashCode(key));
+        if (!preEl) return;
+        navigator.clipboard.writeText(preEl.textContent).then(function () {
+            var orig = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(function () { btn.textContent = orig; }, 1500);
+        });
+    }
+    function hashCode(s) {
+        var h = 0;
+        for (var i = 0; i < s.length; i++) { h = (Math.imul(31, h) + s.charCodeAt(i)) | 0; }
+        return h.toString(16).toUpperCase();
+    }
+    </script>
+    <style>
+    .flag-check { background: #161b22; border-color: #30363d !important; transition: border-color .15s; }
+    .flag-check:has(.form-check-input:checked) { border-color: #388bfd !important; }
+    .tpl-btn.active { background-color: #388bfd; border-color: #388bfd; color: #fff; }
+    #FactoryValue { font-size: .82rem; }
+    </style>
+}

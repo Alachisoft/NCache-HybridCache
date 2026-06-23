@@ -1,0 +1,319 @@
+@{
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+    var showToastNotifications = !currentController.Equals("Tools", StringComparison.OrdinalIgnoreCase);
+}
+@inject HybridCachePlayground.Web.Models.InstanceInfo InstanceInfo
+@{
+    var instanceId  = InstanceInfo.Id;
+    var machineName = InstanceInfo.MachineName;
+    var startedAt   = InstanceInfo.StartedAt.ToLocalTime().ToString("HH:mm:ss");
+}
+<!DOCTYPE html>
+<html lang="en" style="color-scheme: dark;">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - HybridCache Playground</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    @if (showToastNotifications)
+    {
+        <!-- Toast container — bottom-right, above everything -->
+        <div id="toastContainer" aria-live="polite" aria-atomic="true"
+             style="position:fixed;bottom:1.25rem;right:1.25rem;z-index:1100;display:flex;flex-direction:column-reverse;gap:.5rem;max-width:360px;"></div>
+    }
+    <header>
+        <nav class="navbar navbar-expand-md navbar-dark hcp-navbar mb-3">
+            <div class="container-fluid px-3">
+
+                <!-- Brand -->
+                <a class="navbar-brand hcp-brand" asp-controller="Home" asp-action="Index">
+                    <i class="bi bi-speedometer2"></i>
+                    <span>Dashboard</span>
+                </a>
+
+                <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <div class="navbar-collapse collapse">
+                    <!-- Primary nav pills -->
+                    <ul class="navbar-nav mx-auto hcp-nav-pills">
+                        @{
+                            var ctl    = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+                            var action = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
+                            bool IsActive(string c, string a) =>
+                                ctl.Equals(c, StringComparison.OrdinalIgnoreCase) &&
+                                action.Equals(a, StringComparison.OrdinalIgnoreCase);
+                        }
+                        <li class="nav-item">
+                            <a class="hcp-pill @(IsActive("Cache","Set") ? "active" : "")"
+                               asp-controller="Cache" asp-action="Set">
+                                <i class="bi bi-database-add"></i><span>Set</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="hcp-pill @(IsActive("Cache","BulkSet") ? "active" : "")"
+                               asp-controller="Cache" asp-action="BulkSet">
+                                <i class="bi bi-layers"></i><span>Bulk Add</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="hcp-pill @(IsActive("Cache","Get") ? "active" : "")"
+                               asp-controller="Cache" asp-action="Get">
+                                <i class="bi bi-search"></i><span>Get</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="hcp-pill @(IsActive("Cache","Remove") ? "active" : "")"
+                               asp-controller="Cache" asp-action="Remove">
+                                <i class="bi bi-key"></i><span>Remove Key</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="hcp-pill @(IsActive("Cache","RemoveByTag") ? "active" : "")"
+                               asp-controller="Cache" asp-action="RemoveByTag">
+                                <i class="bi bi-tags"></i><span>Remove Tag</span>
+                            </a>
+                        </li>
+                    </ul>
+
+                    <!-- Right-side icon actions -->
+                    <ul class="navbar-nav ms-auto hcp-icon-actions align-items-center gap-1">
+
+                        <!-- Instance badge -->
+                        <li class="nav-item">
+                            <span class="hcp-instance-badge" id="instanceBadge"
+                                  style="color: @InstanceInfo.Color; border-color: @InstanceInfo.Color"
+                                  data-bs-toggle="tooltip" data-bs-placement="bottom"
+                                  title="Instance: @instanceId | Machine: @machineName | Started: @startedAt">
+                                <i class="bi bi-server me-1" style="font-size:.75rem;"></i>@instanceId
+                            </span>
+                        </li>
+
+                        <!-- Concurrent GET — icon only -->
+                        <li class="nav-item">
+                            <a class="hcp-icon-btn @(IsActive("Cache","ConcurrentGet") ? "active" : "") hcp-icon-warning"
+                               asp-controller="Cache" asp-action="ConcurrentGet"
+                               data-bs-toggle="tooltip" data-bs-placement="bottom" title="Concurrent GET Simulator">
+                                <i class="bi bi-arrow-repeat"></i>
+                            </a>
+                        </li>
+
+                        <!-- Stampede — icon only -->
+                        <li class="nav-item">
+                            <a class="hcp-icon-btn @(IsActive("Cache","Stampede") ? "active" : "") hcp-icon-warning"
+                               asp-controller="Cache" asp-action="Stampede"
+                               data-bs-toggle="tooltip" data-bs-placement="bottom" title="Stampede Test">
+                                <i class="bi bi-lightning-charge-fill"></i>
+                            </a>
+                        </li>
+
+                        <!-- Tools — icon only -->
+                        <li class="nav-item">
+                            <a class="hcp-icon-btn @(IsActive("Tools","Index") || ctl.Equals("Tools", StringComparison.OrdinalIgnoreCase) ? "active" : "")"
+                               asp-controller="Tools" asp-action="Index"
+                               data-bs-toggle="tooltip" data-bs-placement="bottom" title="Debug Tools">
+                                <i class="bi bi-tools"></i>
+                            </a>
+                        </li>
+
+                        <!-- Divider -->
+                        <li class="nav-item hcp-divider"></li>
+
+                        <!-- Notification bell -->
+                        <li class="nav-item dropdown">
+                            <a class="hcp-icon-btn position-relative" href="#" role="button"
+                               data-bs-toggle="dropdown" aria-expanded="false" id="notifBell">
+                                <i class="bi bi-bell-fill"></i>
+                                <span id="notifBadge" class="position-absolute badge rounded-pill bg-danger d-none"
+                                      style="top:4px;right:4px;font-size:.55rem;min-width:1.1em;padding:.2em .35em;"></span>
+                            </a>
+                            <div class="dropdown-menu dropdown-menu-end p-0 hcp-notif-dropdown" id="notifDropdown">
+                                <div class="px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
+                                    <span class="fw-semibold small">Notifications</span>
+                                    <a href="@Url.Action("Index","Tools")" class="small text-decoration-none">View all</a>
+                                </div>
+                                <div id="navNotifList" style="max-height:300px;overflow-y:auto;">
+                                    <div class="px-3 py-2 small text-muted">Loading…</div>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
+    <div class="container">
+        <main role="main" class="pb-3">
+            @if (TempData["Message"] is string msg)
+            {
+                var alertClass = TempData["MessageType"]?.ToString() switch
+                {
+                    "success" => "alert-success",
+                    "warning" => "alert-warning",
+                    _ => "alert-info"
+                };
+                <div class="alert @alertClass alert-dismissible fade show" role="alert">
+                    @msg
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+                </div>
+            }
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="border-top footer mt-4">
+        <div class="container py-2 small">
+            HybridCache Playground
+        </div>
+    </footer>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+    @if (showToastNotifications)
+    {
+    <script>
+    // ── Popup toast notifications ─────────────────────────────────────────────
+    (function () {
+        var TOAST_URL      = '/Tools/NotificationsData?count=50';
+        var seenIds        = JSON.parse(sessionStorage.getItem('seenNotifIds') || '[]');
+        var container      = document.getElementById('toastContainer');
+        var MAX_VISIBLE    = 4;
+
+        var BG = {
+            Info:    'bg-info text-dark',
+            Success: 'bg-success text-white',
+            Warning: 'bg-warning text-dark',
+            Error:   'bg-danger text-white'
+        };
+
+        function showToast(n) {
+            var div = document.createElement('div');
+            div.className = 'toast show shadow border-0 ' + (BG[n.level] || 'bg-secondary text-white');
+            div.style.cssText = 'min-width:260px;max-width:360px;border-radius:8px;';
+            div.innerHTML =
+                '<div class="toast-header ' + (BG[n.level] || '') + ' border-0">' +
+                    '<strong class="me-auto">' + escHtml(n.title) + '</strong>' +
+                    '<small class="ms-2 opacity-75">' + n.timestamp + '</small>' +
+                    '<button type="button" class="btn-close ms-2 ' +
+                        (n.level === 'Info' || n.level === 'Warning' ? 'btn-close' : 'btn-close-white') +
+                    '" style="filter:invert(0)"></button>' +
+                '</div>' +
+                '<div class="toast-body py-2">' + escHtml(n.message) + '</div>';
+
+            div.querySelector('.btn-close').addEventListener('click', function () {
+                div.remove();
+            });
+
+            // Cap visible toasts
+            while (container.children.length >= MAX_VISIBLE)
+                container.lastElementChild.remove();
+
+            container.prepend(div);
+
+            // Auto-dismiss after 5 s
+            setTimeout(function () {
+                div.style.transition = 'opacity .4s';
+                div.style.opacity = '0';
+                setTimeout(function () { div.remove(); }, 420);
+            }, 5000);
+        }
+
+        function escHtml(s) {
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        async function pollToasts() {
+            try {
+                var resp = await fetch(TOAST_URL);
+                var data = await resp.json();
+                var newSeen = seenIds.slice();
+                var newItems = [];
+
+                data.entries.forEach(function(n) {
+                    if (!seenIds.includes(n.id)) {
+                        newItems.push(n);
+                        newSeen.push(n.id);
+                    }
+                });
+
+                // Keep seenIds bounded to last 200
+                if (newSeen.length > 200) newSeen = newSeen.slice(-200);
+                seenIds = newSeen;
+                sessionStorage.setItem('seenNotifIds', JSON.stringify(seenIds));
+
+                // Show newest last (bottom of stack = newest)
+                newItems.reverse().forEach(showToast);
+            } catch(e) {}
+        }
+
+        // Initial poll after a short delay, then every 8 s
+        setTimeout(pollToasts, 1500);
+        setInterval(pollToasts, 8000);
+    })();
+    </script>
+    }
+    <script>
+    // Initialise Bootstrap tooltips
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el) {
+        new bootstrap.Tooltip(el, { trigger: 'hover' });
+    });
+    </script>
+    <script>
+    (function () {
+        var NOTIF_URL = '/Tools/NotificationsData?count=10';
+        var MARK_URL  = '/Tools/MarkNotificationsRead';
+
+        function levelClass(lvl) {
+            return { Info:'text-bg-info', Success:'text-bg-success', Warning:'text-bg-warning', Error:'text-bg-danger' }[lvl] || 'text-bg-secondary';
+        }
+
+        async function pollNotifs() {
+            try {
+                var resp = await fetch(NOTIF_URL);
+                var data = await resp.json();
+                var badge = document.getElementById('notifBadge');
+                if (data.unread > 0) {
+                    badge.textContent = data.unread > 9 ? '9+' : data.unread;
+                    badge.classList.remove('d-none');
+                } else {
+                    badge.classList.add('d-none');
+                }
+
+                var list = document.getElementById('navNotifList');
+                if (!data.entries.length) {
+                    list.innerHTML = '<div class="px-3 py-2 small text-muted">No notifications.</div>';
+                    return;
+                }
+                list.innerHTML = data.entries.map(function(n) {
+                    return '<div class="px-3 py-2 border-bottom' + (n.isRead ? '' : ' fw-semibold') + '" style="font-size:.85rem;">' +
+                        '<span class="badge ' + levelClass(n.level) + ' me-1" style="font-size:.65rem;">' + n.level + '</span>' +
+                        '<span>' + n.title + '</span>' +
+                        '<div class="text-muted" style="font-size:.8rem;">' + n.message + '</div>' +
+                    '</div>';
+                }).join('');
+            } catch(e) {}
+        }
+
+        // Mark read when dropdown opens
+        var bell = document.getElementById('notifBell');
+        if (bell) {
+            bell.addEventListener('show.bs.dropdown', function () {
+                var token = document.querySelector('[name=__RequestVerificationToken]');
+                fetch(MARK_URL, { method:'POST', headers: token ? {'RequestVerificationToken': token.value} : {} })
+                    .then(function() { document.getElementById('notifBadge').classList.add('d-none'); });
+            });
+        }
+
+        pollNotifs();
+        setInterval(pollNotifs, 15000);
+    })();
+    </script>
+</body>
+</html>

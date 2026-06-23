@@ -1,0 +1,230 @@
+@using HybridCachePlayground.Web.Models
+@model HybridCachePlayground.Web.Models.ConcurrentGetRequest
+@{
+    ViewData["Title"] = "Concurrent GET Simulator";
+    var result     = ViewData["Result"] as ConcurrentGetResult;
+    var maxConc    = (int)(ViewData["StampedeMax"] ?? 200);
+    var recentKeys = ViewData["RecentKeys"] as List<string> ?? new();
+}
+
+<h2 class="mb-1">Concurrent GET Simulator</h2>
+<p class="text-muted mb-4">
+    Fires <em>N</em> concurrent <code>GetOrCreateAsync</code> calls with a configurable factory delay.
+    Measures how many times the factory actually ran versus how many requests were served from cache.
+</p>
+
+<div class="row g-4">
+    <!-- ── Form ── -->
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header fw-semibold">Test Configuration</div>
+            <div class="card-body">
+                <form asp-action="ConcurrentGet" method="post">
+                    @Html.AntiForgeryToken()
+
+                    <div class="mb-3">
+                        <label asp-for="Key" class="form-label fw-semibold">Cache Key</label>
+                        <input asp-for="Key" id="Key" class="form-control" placeholder="concurrent-test" />
+                        <span asp-validation-for="Key" class="text-danger small"></span>
+                        @if (recentKeys.Any())
+                        {
+                            <div class="mt-1">
+                                <small class="text-muted">Recent: </small>
+                                @foreach (var k in recentKeys)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary chip-suggest"
+                                            data-fill-id="Key" data-fill-val="@k">@k</button>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Concurrency" class="form-label fw-semibold">
+                            Concurrent Requests
+                            <span class="text-muted fw-normal">(2–@maxConc)</span>
+                        </label>
+                        <div class="d-flex gap-2 align-items-center">
+                            <input type="range" class="form-range flex-grow-1" id="concurrencyRange"
+                                   min="2" max="@maxConc" value="@Model.Concurrency"
+                                   oninput="document.getElementById('Concurrency').value=this.value" />
+                            <input asp-for="Concurrency" type="number" class="form-control"
+                                   style="width:80px;" min="2" max="@maxConc"
+                                   oninput="document.getElementById('concurrencyRange').value=this.value" />
+                        </div>
+                        <span asp-validation-for="Concurrency" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="FactoryDelayMs" class="form-label fw-semibold">
+                            Factory Delay
+                            <span class="text-muted fw-normal">(ms, 0–5000)</span>
+                        </label>
+                        <div class="d-flex gap-2 align-items-center">
+                            <input type="range" class="form-range flex-grow-1" id="delayRange"
+                                   min="0" max="5000" step="25" value="@Model.FactoryDelayMs"
+                                   oninput="document.getElementById('FactoryDelayMs').value=this.value" />
+                            <input asp-for="FactoryDelayMs" type="number" class="form-control"
+                                   style="width:80px;" min="0" max="5000"
+                                   oninput="document.getElementById('delayRange').value=this.value" />
+                        </div>
+                        <span asp-validation-for="FactoryDelayMs" class="text-danger small"></span>
+                        <div class="form-text">Simulates a slow DB or external service call in the factory.</div>
+                    </div>
+
+                    <div class="mb-4 form-check">
+                        <input asp-for="ForceEvict" type="checkbox" class="form-check-input" />
+                        <label asp-for="ForceEvict" class="form-check-label">
+                            Evict key before test <span class="text-muted small">(guarantees a cold cache miss)</span>
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">Run Concurrent GET Test</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card border-info mt-3">
+            <div class="card-header bg-info small">What this tests</div>
+            <div class="card-body small">
+                <p>
+                    Unlike the Stampede test (which uses a fixed 50 ms delay), this simulator lets you
+                    tune the factory delay to model real-world scenarios — a slow database query, an
+                    HTTP call, or near-instant in-memory computation.
+                </p>
+                <p class="mb-0">
+                    With HybridCache, all concurrent callers for the same key share a single factory
+                    execution. Watch the <strong>Factory Ran</strong> counter — it should be 0 (all cache hits)
+                    or 1 (stampede protection coalesced all misses into one factory call).
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Results ── -->
+    <div class="col-md-7">
+        @if (result is not null)
+        {
+            var verdictClass = result.FactoryInvocations == 0 ? "alert-warning"
+                             : result.FactoryInvocations == 1 ? "alert-success"
+                             : "alert-danger";
+            var cardClass    = result.FactoryInvocations == 0 ? "border-warning"
+                             : result.FactoryInvocations == 1 ? "border-success"
+                             : "border-danger";
+            var headerClass  = result.FactoryInvocations == 0 ? "bg-warning text-dark"
+                             : result.FactoryInvocations == 1 ? "bg-success text-white"
+                             : "bg-danger text-white";
+
+            <div class="card @cardClass mb-3">
+                <div class="card-header @headerClass fw-semibold">
+                    @if (result.FactoryInvocations == 0)
+                    {
+                        <text>All requests served from cache</text>
+                    }
+                    else if (result.FactoryInvocations == 1)
+                    {
+                        <text>Factory ran once — coalescing confirmed</text>
+                    }
+                    else
+                    {
+                        <text>Factory ran @result.FactoryInvocations times — unexpected</text>
+                    }
+                </div>
+                <div class="card-body">
+                    <!-- Big counters -->
+                    <div class="row g-3 text-center mb-3">
+                        <div class="col-3">
+                            <div class="fs-2 fw-bold text-primary">@result.RequestCount</div>
+                            <div class="small text-muted">Concurrent<br/>Requests</div>
+                        </div>
+                        <div class="col-3">
+                            <div class="fs-2 fw-bold @(result.FactoryInvocations == 1 ? "text-success" : result.FactoryInvocations == 0 ? "text-warning" : "text-danger")">
+                                @result.FactoryInvocations
+                            </div>
+                            <div class="small text-muted">Factory<br/>Ran</div>
+                        </div>
+                        <div class="col-3">
+                            <div class="fs-2 fw-bold text-success">@result.CacheHits</div>
+                            <div class="small text-muted">Cache<br/>Hits</div>
+                        </div>
+                        <div class="col-3">
+                            <div class="fs-2 fw-bold text-secondary">@result.ElapsedMs<span class="fs-6">ms</span></div>
+                            <div class="small text-muted">Elapsed</div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 text-center mb-3">
+                        <div class="col-6">
+                            <div class="fs-5 fw-bold text-success">@result.SuccessfulResponses</div>
+                            <div class="small text-muted">Successful Responses</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="fs-5 fw-bold text-muted">@result.FactoryDelayMs ms</div>
+                            <div class="small text-muted">Factory Delay</div>
+                        </div>
+                    </div>
+
+                    <!-- Factory vs coalesced bar -->
+                    @{
+                        var barCount = Math.Min(result.RequestCount, 40);
+                        var factoryCount = Math.Min(result.FactoryInvocations, barCount);
+                        var coalesceCount = barCount - factoryCount;
+                    }
+                    <div class="mb-3">
+                        <div class="small text-muted mb-1">Factory vs Coalesced Distribution</div>
+                        <div class="position-relative" style="height:50px;background:#0d1117;border-radius:4px;overflow:hidden;padding:6px;border:1px solid #2d3139;">
+                            @for (int i = 0; i < factoryCount; i++)
+                            {
+                                var bw = Math.Max(1, (int)(100.0 / barCount)) + "%";
+                                <div class="d-inline-block me-1" title="factory"
+                                     style="width:@bw;background:#198754;height:36px;border-radius:3px;vertical-align:top;"></div>
+                            }
+                            @for (int i = 0; i < coalesceCount; i++)
+                            {
+                                var bw = Math.Max(1, (int)(100.0 / barCount)) + "%";
+                                <div class="d-inline-block me-1" title="coalesced / cache hit"
+                                     style="width:@bw;background:#0d6efd;height:36px;border-radius:3px;vertical-align:top;"></div>
+                            }
+                        </div>
+                        <div class="small text-muted mt-1">
+                            <span class="badge" style="background:#198754;">factory</span> ran the factory &nbsp;
+                            <span class="badge" style="background:#0d6efd;">coalesced/hit</span> waited or was cached
+                            @if (result.RequestCount > 40)
+                            {
+                                <span class="ms-1">… showing first 40 of @result.RequestCount</span>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="alert @verdictClass mb-3 py-2">
+                        @result.Verdict
+                    </div>
+
+                    @if (result.SampleValue is not null)
+                    {
+                        <div class="mt-2">
+                            <div class="small fw-semibold text-muted mb-1">Value returned to all @result.SuccessfulResponses callers:</div>
+                            <pre class="value-preview small mb-0">@result.SampleValue</pre>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card h-100" style="border-color:#2d3139;">
+                <div class="card-body d-flex align-items-center justify-content-center text-muted">
+                    <div class="text-center">
+                        <div class="fs-1 mb-2">&#128256;</div>
+                        <p>Configure and run the test to see results here.</p>
+                        <p class="small mb-0">Try concurrency = 20, delay = 200 ms, with <em>Force Evict</em> enabled.</p>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

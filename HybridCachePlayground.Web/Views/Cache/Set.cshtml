@@ -1,0 +1,253 @@
+@model HybridCachePlayground.Web.Models.CacheSetRequest
+@{
+    ViewData["Title"] = "Set Cache Entry";
+    var recentKeys = ViewData["RecentKeys"] as List<string> ?? new();
+    var allTags    = ViewData["AllTags"]    as List<string> ?? new();
+}
+
+<h2 class="mb-4">Set Cache Entry</h2>
+<p class="text-muted">
+    Stores a value in HybridCache using
+    <code>HybridCache.SetAsync(key, value, options, tags)</code>.
+</p>
+
+<div class="row">
+    <div class="col-md-7">
+        <form asp-action="Set" method="post">
+            @Html.AntiForgeryToken()
+
+            <!-- Key -->
+            <div class="mb-3">
+                <label asp-for="Key" class="form-label fw-semibold">Cache Key</label>
+                <input asp-for="Key" id="Key" class="form-control" placeholder="e.g. user:42" />
+                <span asp-validation-for="Key" class="text-danger small"></span>
+                @if (recentKeys.Any())
+                {
+                    <div class="mt-1">
+                        <small class="text-muted">Recent: </small>
+                        @foreach (var k in recentKeys)
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-secondary chip-suggest"
+                                    data-fill-id="Key" data-fill-val="@k">@k</button>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- Value -->
+            <div class="mb-3">
+                <label asp-for="Value" class="form-label fw-semibold">
+                    Value <span class="text-muted fw-normal">(any string or JSON)</span>
+                </label>
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary tpl-btn" data-tpl="-1">
+                        <i class="bi bi-shuffle me-1"></i>Random
+                    </button>
+                    @for (var i = 0; i < HybridCachePlayground.Web.Services.RandomDataFactory.Templates.Length; i++)
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary tpl-btn" data-tpl="@i">
+                            @HybridCachePlayground.Web.Services.RandomDataFactory.Templates[i].Label
+                        </button>
+                    }
+                    <button type="button" id="btnRegenerate" class="btn btn-sm btn-outline-secondary d-none">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Regenerate
+                    </button>
+                    <span id="factoryLabel" class="badge text-bg-secondary align-self-center d-none"></span>
+                </div>
+                <textarea asp-for="Value" id="Value" class="form-control font-monospace" rows="6"
+                          placeholder='Click a template above to generate data, or type any string / JSON here.'></textarea>
+                <span asp-validation-for="Value" class="text-danger small"></span>
+                <div class="form-text">Click a template to generate and optionally edit the value. Key is auto-filled if empty.</div>
+            </div>
+
+            <!-- Tags -->
+            <div class="mb-3">
+                <label asp-for="Tags" class="form-label fw-semibold">
+                    Tags <span class="text-muted fw-normal">(comma-separated)</span>
+                </label>
+                <input asp-for="Tags" id="Tags" class="form-control" placeholder="e.g. users, tenant-1, admin" />
+                <div class="form-text">
+                    Tags allow bulk invalidation via <em>Remove by Tag</em>.
+                </div>
+                @if (allTags.Any())
+                {
+                    <div class="mt-1">
+                        <small class="text-muted">Known tags: </small>
+                        @foreach (var t in allTags)
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-secondary chip-suggest chip-tag"
+                                    data-fill-id="Tags" data-fill-val="@t">@t</button>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- Expiration -->
+            <div class="mb-3">
+                <label asp-for="ExpirationMinutes" class="form-label fw-semibold">
+                    Expiration (minutes) <span class="text-muted fw-normal">(optional, defaults to 5)</span>
+                </label>
+                <input asp-for="ExpirationMinutes" type="number" class="form-control" min="1" max="1440" placeholder="5" />
+                <span asp-validation-for="ExpirationMinutes" class="text-danger small"></span>
+                <div class="form-text">L1 (local) TTL = min(this, 2 min). L2 TTL = this value. Leave blank to use default (5 minutes).</div>
+            </div>
+
+            <!-- Write flags -->
+            <div class="mb-4">
+                <label class="form-label fw-semibold">Write Flags</label>
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <div class="border rounded p-2 flag-check d-flex align-items-start gap-2">
+                            <input class="form-check-input flex-shrink-0 mt-1" asp-for="DisableLocalCacheWrite" id="DisableLocalCacheWrite" />
+                            <label for="DisableLocalCacheWrite" class="mb-0" style="cursor:pointer;">
+                                <span class="fw-semibold d-block small">Disable L1 Write</span>
+                                <span class="text-muted" style="font-size:.8rem">Don't store in in-process (L1) cache.</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="border rounded p-2 flag-check d-flex align-items-start gap-2">
+                            <input class="form-check-input flex-shrink-0 mt-1" asp-for="DisableDistributedCacheWrite" id="DisableDistributedCacheWrite" />
+                            <label for="DisableDistributedCacheWrite" class="mb-0" style="cursor:pointer;">
+                                <span class="fw-semibold d-block small">Disable L2 Write</span>
+                                <span class="text-muted" style="font-size:.8rem">Don't store in distributed (L2) cache.</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary"
+                    data-bs-toggle="tooltip" title="Store the entry in HybridCache with specified options">
+                <i class="bi bi-save me-1"></i>Store in Cache
+            </button>
+            <button type="button" id="btnClear" class="btn btn-outline-secondary"
+                    data-bs-toggle="tooltip" title="Clear all form fields">
+                <i class="bi bi-x-circle me-1"></i>Clear
+            </button>
+            <a asp-controller="Home" asp-action="Index" class="btn btn-link"
+               data-bs-toggle="tooltip" title="Return to the dashboard">
+                <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+            </a>
+        </form>
+    </div>
+
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header bg-secondary small">API used</div>
+            <div class="card-body">
+                <pre class="small mb-0"><code>await hybridCache.SetAsync(
+    key,
+    value,
+    new HybridCacheEntryOptions
+    {
+        Expiration = TimeSpan.FromMinutes(ttl),
+        LocalCacheExpiration =
+            TimeSpan.FromMinutes(2)
+    },
+    tags: ["tag1", "tag2"]);</code></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <style>
+    .flag-check { background: #161b22; border-color: #30363d !important; transition: border-color .15s; }
+    .flag-check:has(.form-check-input:checked) { border-color: #388bfd !important; }
+    </style>
+    <script>
+    // ── Initialize Bootstrap tooltips ──────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function () {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+
+    // ── Fill-chip: click populates an input field ──────────────────────────
+    document.querySelectorAll('[data-fill-id]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var inputId = btn.getAttribute('data-fill-id');
+            var val     = btn.getAttribute('data-fill-val');
+            var el      = document.getElementById(inputId);
+            if (!el) return;
+
+            if (btn.classList.contains('chip-tag')) {
+                // Append tag if not already present
+                var parts = el.value.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+                if (!parts.includes(val)) { parts.push(val); }
+                el.value = parts.join(', ');
+            } else {
+                el.value = val;
+            }
+        });
+    });
+
+    // ── Template buttons ──────────────────────────────────────────────────
+    var GENERATE_URL = '@Url.Action("GenerateValue", "Cache")';
+    var currentTpl = -1;
+
+    async function loadTemplate(tpl) {
+        currentTpl = tpl;
+        document.getElementById('btnRegenerate').classList.remove('d-none');
+
+        document.querySelectorAll('.tpl-btn').forEach(function(b) {
+            b.classList.toggle('active', parseInt(b.dataset.tpl) === tpl);
+        });
+
+        try {
+            var resp = await fetch(GENERATE_URL + '?templateIndex=' + tpl);
+            if (!resp.ok) throw new Error('Request failed');
+            var data = await resp.json();
+
+            document.getElementById('Value').value = data.json;
+
+            var labelBadge = document.getElementById('factoryLabel');
+            labelBadge.textContent = data.label;
+            labelBadge.classList.remove('d-none');
+
+            // Auto-fill tags with template suggestions (merge, don't overwrite manual additions)
+            var tagsEl = document.getElementById('Tags');
+            var existing = tagsEl.value.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+            var suggested = data.tags || [];
+            suggested.forEach(function(t) {
+                if (!existing.includes(t)) existing.push(t);
+            });
+            tagsEl.value = existing.join(', ');
+
+            // Auto-fill key if empty
+            var keyEl = document.getElementById('Key');
+            if (!keyEl.value) {
+                keyEl.value = data.label.toLowerCase() + '-' + Math.floor(Math.random() * 9000 + 1000);
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    document.querySelectorAll('.tpl-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() { loadTemplate(parseInt(btn.dataset.tpl)); });
+    });
+
+    document.getElementById('btnRegenerate').addEventListener('click', function() {
+        loadTemplate(currentTpl);
+    });
+
+    // ── Clear button ──────────────────────────────────────────────────────
+    document.getElementById('btnClear').addEventListener('click', function() {
+        document.getElementById('Key').value   = '';
+        document.getElementById('Value').value = '';
+        document.getElementById('Tags').value  = '';
+        document.getElementById('factoryLabel').classList.add('d-none');
+        document.getElementById('btnRegenerate').classList.add('d-none');
+        document.querySelectorAll('.tpl-btn').forEach(function(b) { b.classList.remove('active'); });
+        currentTpl = -1;
+    });
+    </script>
+    <style>
+    .tpl-btn.active { background-color: #388bfd; border-color: #388bfd; color: #fff; }
+    #Value { font-size: .82rem; }
+    </style>
+}
