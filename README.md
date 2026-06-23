@@ -154,6 +154,7 @@ ValueTask<T> GetOrCreateAsync<TState, T>(
 - **Factory invocation**: Passes `cancellationToken` to factory function.
 - **Cache population**: L2 populated first (with `Expiration` from options or config), then L1 (with `LocalCacheExpiration`).
 
+- 
 **Example:**
 
 ```csharp
