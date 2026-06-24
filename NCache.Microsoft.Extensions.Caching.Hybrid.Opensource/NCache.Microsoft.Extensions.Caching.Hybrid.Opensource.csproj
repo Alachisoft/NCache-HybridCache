@@ -1,0 +1,51 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+
+		<!-- NuGet Package Configuration -->
+		<PackageId>NCache.OSS.Microsoft.Extensions.Caching.Hybrid</PackageId>
+		<Version>5.3.6.1</Version>
+		<Authors>Alachisoft</Authors>
+		<Company>Alachisoft</Company>
+		<Description>NCache Opensource implementation for ASP.NET Core HybridCache providing Local L1 and distributed L2 caching with tag-based invalidation and NCache backbone synchronization.</Description>
+		<Copyright>Copyright 2005-2026 Alachisoft. All rights reserved.</Copyright>
+		<PackageTags>Alachisoft;NCache;Cache;Caching;DistributedCache;In-Memory;Opensource;HybridCache;AspNetCore;Distributed;L1;L2</PackageTags>
+
+		<!-- Package URLs -->
+		<PackageProjectUrl>https://www.alachisoft.com/ncache/</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/Alachisoft/NCache</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+
+		<!-- Package License -->
+		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+		<PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+
+		<!-- Package Icon and Readme -->
+		<PackageIcon>Icon.png</PackageIcon>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Alachisoft.NCache.Opensource.SDK" Version="5.3.6.2" />
+		<PackageReference Include="Microsoft.Extensions.Caching.Hybrid" Version="10.5.0" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.7" />
+		<PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.7" />
+	</ItemGroup>
+
+	<!-- Package Content Files -->
+	<ItemGroup>
+		<None Include="README.md" Pack="true" PackagePath="\" />
+		<None Include="LICENSE.txt" Pack="true" PackagePath="\" />
+		<None Include="Icon.png" Pack="true" PackagePath="\" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Update="config.ncconf">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
+</Project>
