@@ -20,4 +20,8 @@
     <ProjectReference Include="..\NCache.Microsoft.Extensions.Caching.Hybrid.Opensource\NCache.Microsoft.Extensions.Caching.Hybrid.Opensource.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="logs\" />
+  </ItemGroup>
+
 </Project>
