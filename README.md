@@ -1,4 +1,4 @@
-﻿# NCache.Microsoft.Extensions.Caching.Hybrid.Opensource
+﻿# NCache.OSS.Caching.Hybrid
 
 **NCache Open Source implementation for ASP.NET Core HybridCache** providing Local L1 and distributed L2 caching with tag-based invalidation and NCache Pub/Sub synchronization.
 
@@ -6,7 +6,7 @@
 
 | Package | Version |
 |---------|---------|
-| NCache.OSS.Microsoft.Extensions.Caching.Hybrid | 5.3.6.1 |
+| NCache.OSS.Caching.Hybrid | 5.3.6.1 |
 | Alachisoft.NCache.Opensource.SDK | >= 5.3.6.2 |
 | Microsoft.Extensions.Caching.Hybrid | >= 10.4.0 |
 
@@ -26,22 +26,22 @@
 Install via NuGet Package Manager:
 
 ```bash
-dotnet add package NCache.OSS.Microsoft.Extensions.Caching.Hybrid
+dotnet add package NCache.OSS.Caching.Hybrid
 ```
 
 Or via Package Manager Console:
 
 ```powershell
-Install-Package NCache.OSS.Microsoft.Extensions.Caching.Hybrid
+Install-Package NCache.OSS.Caching.Hybrid
 ```
 
 ## Prerequisites
 
 Before using this package, ensure you have:
 
-1. **NCache Server** – A running NCache cluster (Open Source or Enterprise)
+1. **NCache Server** – A running NCache cluster 
 2. **Local Cache** – An In-Proc cache configured for L1 caching
-3. **Distributed Cache** – A Replicated/Partitioned cache configured for L2 caching
+3. **Distributed Cache** – A Replicated cache configured for L2 caching
 
 ## Quick Start
 
