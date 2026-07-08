@@ -2,7 +2,7 @@
 using Alachisoft.NCache.Runtime.Caching;
 using System.Collections.Concurrent;
 
-namespace NCache.OSS.Microsoft.Extensions.Caching.Hybrid
+namespace NCache.OSS.Caching.Hybrid
 {
     /// <summary>
     /// Records tags that have been marked for logical deletion and keeps a death-time for each tag.

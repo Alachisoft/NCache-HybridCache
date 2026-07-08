@@ -1,7 +1,7 @@
 ﻿using Alachisoft.NCache.Client;
 using System.Net;
 
-namespace NCache.OSS.Microsoft.Extensions.Caching.Hybrid
+namespace NCache.OSS.Caching.Hybrid
 {
     /// <summary>
     /// Represents the configuration options for integrating NCache as a hybrid cache provider, specifying both local

@@ -1,6 +1,6 @@
 using HybridCachePlayground.Web.Models;
 using HybridCachePlayground.Web.Services;
-using NCache.OSS.Microsoft.Extensions.Caching.Hybrid;
+using NCache.OSS.Caching.Hybrid;
 using Serilog;
 
 // ─── Set SESSION_ID environment variable BEFORE configuration is built ────────

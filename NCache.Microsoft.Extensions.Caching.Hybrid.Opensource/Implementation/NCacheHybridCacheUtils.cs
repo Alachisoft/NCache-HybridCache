@@ -1,6 +1,6 @@
 ﻿using Alachisoft.NCache.Client;
 
-namespace NCache.OSS.Microsoft.Extensions.Caching.Hybrid
+namespace NCache.OSS.Caching.Hybrid
 {
     /// <summary>
     /// Provides default values and utility methods for the NCache hybrid cache implementation.
