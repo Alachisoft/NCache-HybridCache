@@ -2,7 +2,7 @@ using Alachisoft.NCache.Client;
 using Alachisoft.NCache.Runtime.Caching;
 using HybridCachePlayground.Web.Models;
 using Microsoft.Extensions.Options;
-using NCache.OSS.Microsoft.Extensions.Caching.Hybrid;
+using NCache.OSS.Caching.Hybrid;
 using System.Text.Json;
 
 namespace HybridCachePlayground.Web.Services;

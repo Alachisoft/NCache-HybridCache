@@ -7,7 +7,7 @@ using System.Collections.Concurrent;
 using System.Drawing;
 using CacheItem = Alachisoft.NCache.Client.CacheItem;
 
-namespace NCache.OSS.Microsoft.Extensions.Caching.Hybrid
+namespace NCache.OSS.Caching.Hybrid
 {
     public sealed class NCacheHybridCache : HybridCache, IDisposable
     {

@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace NCache.OSS.Microsoft.Extensions.Caching.Hybrid
+namespace NCache.OSS.Caching.Hybrid
 {
     /// <summary>
     /// Represents a cache item for hybrid caching scenarios that stores a value along with associated tags and a creation timestamp.

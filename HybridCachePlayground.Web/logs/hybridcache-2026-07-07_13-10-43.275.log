@@ -1,0 +1,271 @@
+[13:10:47.358] [INF] Microsoft.Hosting.Lifetime: Now listening on: https://localhost:7020
+[13:10:47.373] [INF] Microsoft.Hosting.Lifetime: Now listening on: http://localhost:5280
+[13:10:47.712] [INF] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+[13:10:47.727] [INF] Microsoft.Hosting.Lifetime: Hosting environment: Development
+[13:10:47.730] [INF] Microsoft.Hosting.Lifetime: Content root path: D:\ncache-integrations\NCache\Integration\HybridCache\HybridCachePlayground.Web
+[13:10:53.773] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Successfully initialized local cache with name 'demoLocalCache'.
+[13:10:55.960] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Successfully initialized distributed cache with name 'demoCache'.
+[13:10:56.019] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Successfully initialized NCacheHybridCache
+[13:10:56.027] [INF] HybridCachePlayground.Web.Services.CachePlaygroundService: CachePlaygroundService initialised | DefaultTTL: 5m | LocalTTL: 2m
+[13:10:56.043] [DBG] HybridCachePlayground.Web.Controllers.HomeController: Dashboard loaded | ActiveEntries: 0 | Hits: 0 | Misses: 0 | HitRatio: 0%
+[13:10:56.278] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET / responded 200 in 8006.0ms
+[13:10:56.775] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 86.7ms
+[13:10:58.177] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 2.7ms
+[13:11:04.683] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 0.9ms
+[13:11:11.689] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 0.6ms
+[13:11:12.686] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 0.5ms
+[13:11:20.696] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 0.6ms
+[13:11:26.691] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 0.6ms
+[13:11:28.682] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 0.6ms
+[13:11:36.676] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 0.5ms
+[13:11:41.685] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 0.3ms
+[13:11:44.679] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 1.0ms
+[13:11:50.636] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Cache/BulkSet responded 200 in 64.1ms
+[13:11:50.755] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 1.1ms
+[13:11:52.240] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 0.6ms
+[13:11:53.815] [INF] HybridCachePlayground.Web.Controllers.CacheController: Bulk Add requested | Prefix: bulk | Count: 10 | TTL: 5m
+[13:11:53.821] [INF] HybridCachePlayground.Web.Services.CachePlaygroundService: Bulk SET START | Prefix: bulk | Count: 10 | TTL: 5m | Tags: []
+[13:11:53.839] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: GetOrCreateAsync called for key 'bulk-1'
+[13:11:53.842] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: GetOrCreateAsync flags: "None", tags: order
+[13:11:53.849] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Attempting L1 read for key 'bulk-1'
+[13:11:53.878] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: L1 cache miss for key 'bulk-1'
+[13:11:53.880] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Attempting L2 read for key 'bulk-1'
+[13:11:53.895] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: L2 cache miss for key 'bulk-1'
+[13:11:53.897] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Waiting on semaphore for key 'bulk-1'
+[13:11:53.899] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Acquired semaphore for key 'bulk-1'
+[13:11:53.904] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Cache miss for key 'bulk-1', invoking factory
+[13:11:53.906] [INF] HybridCachePlayground.Web.Services.CachePlaygroundService: Bulk SET Factory | Key: bulk-1 | Label: Order
+[13:11:53.907] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserting key 'bulk-1' into L2 from factory
+[13:11:54.065] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Publishing cache update for key 'bulk-1'
+[13:11:54.087] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Published cache update for key 'bulk-1'
+[13:11:54.090] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserted key 'bulk-1' into L2 from factory
+[13:11:54.094] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserting key 'bulk-1' into L1
+[13:11:54.118] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserted key 'bulk-1' into L1 from factory
+[13:11:54.121] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Returning fresh value for key 'bulk-1'
+[13:11:54.123] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Released semaphore for key 'bulk-1'
+[13:11:54.133] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: GetOrCreateAsync called for key 'bulk-2'
+[13:11:54.136] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: GetOrCreateAsync flags: "None", tags: product
+[13:11:54.140] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Attempting L1 read for key 'bulk-2'
+[13:11:54.143] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: L1 cache miss for key 'bulk-2'
+[13:11:54.145] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Attempting L2 read for key 'bulk-2'
+[13:11:54.147] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: L2 cache miss for key 'bulk-2'
+[13:11:54.149] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Waiting on semaphore for key 'bulk-2'
+[13:11:54.150] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Acquired semaphore for key 'bulk-2'
+[13:11:54.152] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Cache miss for key 'bulk-2', invoking factory
+[13:11:54.153] [INF] HybridCachePlayground.Web.Services.CachePlaygroundService: Bulk SET Factory | Key: bulk-2 | Label: Product
+[13:11:54.154] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserting key 'bulk-2' into L2 from factory
+[13:11:54.155] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Publishing cache update for key 'bulk-2'
+[13:11:54.157] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Published cache update for key 'bulk-2'
+[13:11:54.158] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserted key 'bulk-2' into L2 from factory
+[13:11:54.159] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserting key 'bulk-2' into L1
+[13:11:54.160] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserted key 'bulk-2' into L1 from factory
+[13:11:54.161] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Returning fresh value for key 'bulk-2'
+[13:11:54.162] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Released semaphore for key 'bulk-2'
+[13:11:54.163] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: GetOrCreateAsync called for key 'bulk-3'
+[13:11:54.165] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: GetOrCreateAsync flags: "None", tags: product
+[13:11:54.167] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Attempting L1 read for key 'bulk-3'
+[13:11:54.168] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: L1 cache miss for key 'bulk-3'
+[13:11:54.169] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Attempting L2 read for key 'bulk-3'
+[13:11:54.171] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: L2 cache miss for key 'bulk-3'
+[13:11:54.172] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Waiting on semaphore for key 'bulk-3'
+[13:11:54.173] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Acquired semaphore for key 'bulk-3'
+[13:11:54.174] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Cache miss for key 'bulk-3', invoking factory
+[13:11:54.175] [INF] HybridCachePlayground.Web.Services.CachePlaygroundService: Bulk SET Factory | Key: bulk-3 | Label: Product
+[13:11:54.176] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserting key 'bulk-3' into L2 from factory
+[13:11:54.177] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Publishing cache update for key 'bulk-3'
+[13:11:54.179] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Published cache update for key 'bulk-3'
+[13:11:54.181] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserted key 'bulk-3' into L2 from factory
+[13:11:54.183] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserting key 'bulk-3' into L1
+[13:11:54.186] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserted key 'bulk-3' into L1 from factory
+[13:11:54.187] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Returning fresh value for key 'bulk-3'
+[13:11:54.189] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Released semaphore for key 'bulk-3'
+[13:11:54.190] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: GetOrCreateAsync called for key 'bulk-4'
+[13:11:54.191] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: GetOrCreateAsync flags: "None", tags: user
+[13:11:54.193] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Attempting L1 read for key 'bulk-4'
+[13:11:54.194] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: L1 cache miss for key 'bulk-4'
+[13:11:54.196] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Attempting L2 read for key 'bulk-4'
+[13:11:54.198] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: L2 cache miss for key 'bulk-4'
+[13:11:54.199] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Waiting on semaphore for key 'bulk-4'
+[13:11:54.200] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Acquired semaphore for key 'bulk-4'
+[13:11:54.202] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Cache miss for key 'bulk-4', invoking factory
+[13:11:54.203] [INF] HybridCachePlayground.Web.Services.CachePlaygroundService: Bulk SET Factory | Key: bulk-4 | Label: User
+[13:11:54.204] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserting key 'bulk-4' into L2 from factory
+[13:11:54.206] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Publishing cache update for key 'bulk-4'
+[13:11:54.208] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Published cache update for key 'bulk-4'
+[13:11:54.209] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserted key 'bulk-4' into L2 from factory
+[13:11:54.210] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserting key 'bulk-4' into L1
+[13:11:54.213] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserted key 'bulk-4' into L1 from factory
+[13:11:54.215] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Returning fresh value for key 'bulk-4'
+[13:11:54.216] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Released semaphore for key 'bulk-4'
+[13:11:54.217] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: GetOrCreateAsync called for key 'bulk-5'
+[13:11:54.218] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: GetOrCreateAsync flags: "None", tags: product
+[13:11:54.219] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Attempting L1 read for key 'bulk-5'
+[13:11:54.221] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: L1 cache miss for key 'bulk-5'
+[13:11:54.222] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Attempting L2 read for key 'bulk-5'
+[13:11:54.223] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: L2 cache miss for key 'bulk-5'
+[13:11:54.224] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Waiting on semaphore for key 'bulk-5'
+[13:11:54.225] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Acquired semaphore for key 'bulk-5'
+[13:11:54.226] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Cache miss for key 'bulk-5', invoking factory
+[13:11:54.227] [INF] HybridCachePlayground.Web.Services.CachePlaygroundService: Bulk SET Factory | Key: bulk-5 | Label: Product
+[13:11:54.228] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserting key 'bulk-5' into L2 from factory
+[13:11:54.229] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Publishing cache update for key 'bulk-5'
+[13:11:54.233] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Published cache update for key 'bulk-5'
+[13:11:54.235] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserted key 'bulk-5' into L2 from factory
+[13:11:54.236] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserting key 'bulk-5' into L1
+[13:11:54.238] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserted key 'bulk-5' into L1 from factory
+[13:11:54.239] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Returning fresh value for key 'bulk-5'
+[13:11:54.241] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Released semaphore for key 'bulk-5'
+[13:11:54.243] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: GetOrCreateAsync called for key 'bulk-6'
+[13:11:54.244] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: GetOrCreateAsync flags: "None", tags: order
+[13:11:54.245] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Attempting L1 read for key 'bulk-6'
+[13:11:54.246] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: L1 cache miss for key 'bulk-6'
+[13:11:54.249] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Attempting L2 read for key 'bulk-6'
+[13:11:54.251] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: L2 cache miss for key 'bulk-6'
+[13:11:54.253] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Waiting on semaphore for key 'bulk-6'
+[13:11:54.254] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Acquired semaphore for key 'bulk-6'
+[13:11:54.256] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Cache miss for key 'bulk-6', invoking factory
+[13:11:54.257] [INF] HybridCachePlayground.Web.Services.CachePlaygroundService: Bulk SET Factory | Key: bulk-6 | Label: Order
+[13:11:54.258] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserting key 'bulk-6' into L2 from factory
+[13:11:54.260] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Publishing cache update for key 'bulk-6'
+[13:11:54.262] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Published cache update for key 'bulk-6'
+[13:11:54.263] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserted key 'bulk-6' into L2 from factory
+[13:11:54.264] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserting key 'bulk-6' into L1
+[13:11:54.267] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserted key 'bulk-6' into L1 from factory
+[13:11:54.268] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Returning fresh value for key 'bulk-6'
+[13:11:54.269] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Released semaphore for key 'bulk-6'
+[13:11:54.270] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: GetOrCreateAsync called for key 'bulk-7'
+[13:11:54.271] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: GetOrCreateAsync flags: "None", tags: product
+[13:11:54.272] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Attempting L1 read for key 'bulk-7'
+[13:11:54.273] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: L1 cache miss for key 'bulk-7'
+[13:11:54.274] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Attempting L2 read for key 'bulk-7'
+[13:11:54.276] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: L2 cache miss for key 'bulk-7'
+[13:11:54.277] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Waiting on semaphore for key 'bulk-7'
+[13:11:54.278] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Acquired semaphore for key 'bulk-7'
+[13:11:54.279] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Cache miss for key 'bulk-7', invoking factory
+[13:11:54.280] [INF] HybridCachePlayground.Web.Services.CachePlaygroundService: Bulk SET Factory | Key: bulk-7 | Label: Product
+[13:11:54.282] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserting key 'bulk-7' into L2 from factory
+[13:11:54.285] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Publishing cache update for key 'bulk-7'
+[13:11:54.287] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Published cache update for key 'bulk-7'
+[13:11:54.289] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserted key 'bulk-7' into L2 from factory
+[13:11:54.291] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserting key 'bulk-7' into L1
+[13:11:54.293] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserted key 'bulk-7' into L1 from factory
+[13:11:54.294] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Returning fresh value for key 'bulk-7'
+[13:11:54.295] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Released semaphore for key 'bulk-7'
+[13:11:54.297] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: GetOrCreateAsync called for key 'bulk-8'
+[13:11:54.298] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: GetOrCreateAsync flags: "None", tags: employee
+[13:11:54.300] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Attempting L1 read for key 'bulk-8'
+[13:11:54.302] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: L1 cache miss for key 'bulk-8'
+[13:11:54.304] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Attempting L2 read for key 'bulk-8'
+[13:11:54.306] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: L2 cache miss for key 'bulk-8'
+[13:11:54.307] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Waiting on semaphore for key 'bulk-8'
+[13:11:54.308] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Acquired semaphore for key 'bulk-8'
+[13:11:54.309] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Cache miss for key 'bulk-8', invoking factory
+[13:11:54.311] [INF] HybridCachePlayground.Web.Services.CachePlaygroundService: Bulk SET Factory | Key: bulk-8 | Label: Employee
+[13:11:54.312] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserting key 'bulk-8' into L2 from factory
+[13:11:54.314] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Publishing cache update for key 'bulk-8'
+[13:11:54.317] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Published cache update for key 'bulk-8'
+[13:11:54.318] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserted key 'bulk-8' into L2 from factory
+[13:11:54.319] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserting key 'bulk-8' into L1
+[13:11:54.320] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserted key 'bulk-8' into L1 from factory
+[13:11:54.321] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Returning fresh value for key 'bulk-8'
+[13:11:54.322] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Released semaphore for key 'bulk-8'
+[13:11:54.324] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: GetOrCreateAsync called for key 'bulk-9'
+[13:11:54.325] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: GetOrCreateAsync flags: "None", tags: user
+[13:11:54.326] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Attempting L1 read for key 'bulk-9'
+[13:11:54.327] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: L1 cache miss for key 'bulk-9'
+[13:11:54.328] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Attempting L2 read for key 'bulk-9'
+[13:11:54.330] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: L2 cache miss for key 'bulk-9'
+[13:11:54.332] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Waiting on semaphore for key 'bulk-9'
+[13:11:54.334] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Acquired semaphore for key 'bulk-9'
+[13:11:54.336] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Cache miss for key 'bulk-9', invoking factory
+[13:11:54.337] [INF] HybridCachePlayground.Web.Services.CachePlaygroundService: Bulk SET Factory | Key: bulk-9 | Label: User
+[13:11:54.338] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserting key 'bulk-9' into L2 from factory
+[13:11:54.339] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Publishing cache update for key 'bulk-9'
+[13:11:54.341] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Published cache update for key 'bulk-9'
+[13:11:54.342] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserted key 'bulk-9' into L2 from factory
+[13:11:54.343] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserting key 'bulk-9' into L1
+[13:11:54.344] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserted key 'bulk-9' into L1 from factory
+[13:11:54.346] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Returning fresh value for key 'bulk-9'
+[13:11:54.347] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Released semaphore for key 'bulk-9'
+[13:11:54.349] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: GetOrCreateAsync called for key 'bulk-10'
+[13:11:54.351] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: GetOrCreateAsync flags: "None", tags: employee
+[13:11:54.352] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Attempting L1 read for key 'bulk-10'
+[13:11:54.354] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: L1 cache miss for key 'bulk-10'
+[13:11:54.355] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Attempting L2 read for key 'bulk-10'
+[13:11:54.356] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: L2 cache miss for key 'bulk-10'
+[13:11:54.358] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Waiting on semaphore for key 'bulk-10'
+[13:11:54.359] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Acquired semaphore for key 'bulk-10'
+[13:11:54.360] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Cache miss for key 'bulk-10', invoking factory
+[13:11:54.361] [INF] HybridCachePlayground.Web.Services.CachePlaygroundService: Bulk SET Factory | Key: bulk-10 | Label: Employee
+[13:11:54.362] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserting key 'bulk-10' into L2 from factory
+[13:11:54.365] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Publishing cache update for key 'bulk-10'
+[13:11:54.367] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Published cache update for key 'bulk-10'
+[13:11:54.369] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserted key 'bulk-10' into L2 from factory
+[13:11:54.370] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserting key 'bulk-10' into L1
+[13:11:54.372] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Inserted key 'bulk-10' into L1 from factory
+[13:11:54.373] [INF] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Returning fresh value for key 'bulk-10'
+[13:11:54.374] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Released semaphore for key 'bulk-10'
+[13:11:54.375] [INF] HybridCachePlayground.Web.Services.CachePlaygroundService: Bulk SET COMPLETE | Prefix: bulk | Added: 10 | Elapsed: 553ms
+[13:11:54.391] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP POST /Cache/BulkSet responded 200 in 606.0ms
+[13:11:54.440] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 0.5ms
+[13:11:54.718] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Received message with ID 'JuP66VqTN0qxVhQQvBphZA'
+[13:11:54.723] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Received message with ID '9BrsYO64u0ONNZtteDdKSA'
+[13:11:54.739] [INF] HybridCachePlayground.Web.Services.NotificationService: Notification ["Success"] Message  received: [bulk-1] item updated
+[13:11:54.739] [INF] HybridCachePlayground.Web.Services.NotificationService: Notification ["Success"] Message  received: [bulk-4] item updated
+[13:11:54.779] [INF] HybridCachePlayground.Web.Services.NotificationService: Notification ["Success"] Message  received: [bulk-7] item updated
+[13:11:54.787] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Received message with ID 'i9CHDM5BjE2S4DMhihYU5g'
+[13:11:54.803] [INF] HybridCachePlayground.Web.Services.NotificationService: Notification ["Success"] Message  received: [bulk-10] item updated
+[13:11:54.747] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Processing message with ID '9BrsYO64u0ONNZtteDdKSA' and payload of type 'NCacheHybridCacheMessage'
+[13:11:54.718] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Received message with ID 'wCphGJIWaEuDs2O2WTKJ0Q'
+[13:11:54.739] [INF] HybridCachePlayground.Web.Services.NotificationService: Notification ["Success"] Message  received: [bulk-3] item updated
+[13:11:54.718] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Received message with ID 'X7opkSvftUCGFcchdkUtyA'
+[13:11:54.739] [INF] HybridCachePlayground.Web.Services.NotificationService: Notification ["Success"] Message  received: [bulk-2] item updated
+[13:11:54.728] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Processing message with ID 'JuP66VqTN0qxVhQQvBphZA' and payload of type 'NCacheHybridCacheMessage'
+[13:11:54.728] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Received message with ID 'HfO_WcMiCkuloMLqSc8NCg'
+[13:11:54.739] [INF] HybridCachePlayground.Web.Services.NotificationService: Notification ["Success"] Message  received: [bulk-5] item updated
+[13:11:54.751] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Received message with ID '7BhsLsbKCUSvwsgNMIHpyQ'
+[13:11:54.761] [INF] HybridCachePlayground.Web.Services.NotificationService: Notification ["Success"] Message  received: [bulk-6] item updated
+[13:11:54.771] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Received message with ID 'cjK4mBmEyUOSE8mxoPic7w'
+[13:11:54.779] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Received message with ID 'geM9sMxnBEayThB4-fZmTQ'
+[13:11:54.787] [INF] HybridCachePlayground.Web.Services.NotificationService: Notification ["Success"] Message  received: [bulk-8] item updated
+[13:11:54.795] [INF] HybridCachePlayground.Web.Services.NotificationService: Notification ["Success"] Message  received: [bulk-9] item updated
+[13:11:54.803] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Received message with ID 'nC0KVA4UkUKEyx_os0daFA'
+[13:11:54.811] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Processing message with ID 'i9CHDM5BjE2S4DMhihYU5g' and payload of type 'NCacheHybridCacheMessage'
+[13:11:54.813] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Ignoring message with ID '9BrsYO64u0ONNZtteDdKSA' as it originated from this instance
+[13:11:54.815] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Processing message with ID 'wCphGJIWaEuDs2O2WTKJ0Q' and payload of type 'NCacheHybridCacheMessage'
+[13:11:54.817] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Processing message with ID 'X7opkSvftUCGFcchdkUtyA' and payload of type 'NCacheHybridCacheMessage'
+[13:11:54.820] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Ignoring message with ID 'JuP66VqTN0qxVhQQvBphZA' as it originated from this instance
+[13:11:54.821] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Processing message with ID 'HfO_WcMiCkuloMLqSc8NCg' and payload of type 'NCacheHybridCacheMessage'
+[13:11:54.823] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Processing message with ID '7BhsLsbKCUSvwsgNMIHpyQ' and payload of type 'NCacheHybridCacheMessage'
+[13:11:54.825] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Processing message with ID 'cjK4mBmEyUOSE8mxoPic7w' and payload of type 'NCacheHybridCacheMessage'
+[13:11:54.826] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Processing message with ID 'geM9sMxnBEayThB4-fZmTQ' and payload of type 'NCacheHybridCacheMessage'
+[13:11:54.831] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Processing message with ID 'nC0KVA4UkUKEyx_os0daFA' and payload of type 'NCacheHybridCacheMessage'
+[13:11:54.833] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Ignoring message with ID 'i9CHDM5BjE2S4DMhihYU5g' as it originated from this instance
+[13:11:54.835] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Ignoring message with ID 'wCphGJIWaEuDs2O2WTKJ0Q' as it originated from this instance
+[13:11:54.836] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Ignoring message with ID 'X7opkSvftUCGFcchdkUtyA' as it originated from this instance
+[13:11:54.839] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Ignoring message with ID 'HfO_WcMiCkuloMLqSc8NCg' as it originated from this instance
+[13:11:54.840] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Ignoring message with ID '7BhsLsbKCUSvwsgNMIHpyQ' as it originated from this instance
+[13:11:54.841] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Ignoring message with ID 'cjK4mBmEyUOSE8mxoPic7w' as it originated from this instance
+[13:11:54.843] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Ignoring message with ID 'geM9sMxnBEayThB4-fZmTQ' as it originated from this instance
+[13:11:54.844] [DBG] NCache.OSS.Microsoft.Extensions.Caching.Hybrid.NCacheHybridCache: Ignoring message with ID 'nC0KVA4UkUKEyx_os0daFA' as it originated from this instance
+[13:11:55.963] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 9.4ms
+[13:11:58.652] [DBG] HybridCachePlayground.Web.Controllers.HomeController: Dashboard loaded | ActiveEntries: 10 | Hits: 0 | Misses: 0 | HitRatio: 0%
+[13:11:58.673] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET / responded 200 in 24.4ms
+[13:11:58.719] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 2.2ms
+[13:12:00.219] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 0.7ms
+[13:12:03.671] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Cache/Get responded 200 in 29.8ms
+[13:12:03.722] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 2.0ms
+[13:12:05.201] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 0.3ms
+[13:12:11.714] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 2.0ms
+[13:12:14.418] [DBG] HybridCachePlayground.Web.Controllers.HomeController: Dashboard loaded | ActiveEntries: 10 | Hits: 0 | Misses: 0 | HitRatio: 0%
+[13:12:14.433] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET / responded 200 in 15.5ms
+[13:12:14.487] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 1.1ms
+[13:12:15.982] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 0.5ms
+[13:12:22.489] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 0.7ms
+[13:12:29.489] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 0.9ms
+[13:12:30.491] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 0.7ms
+[13:12:38.486] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 1.0ms
+[13:12:44.495] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 1.1ms
+[13:12:46.483] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 0.6ms
+[13:12:54.483] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 0.5ms
+[13:12:59.491] [INF] Serilog.AspNetCore.RequestLoggingMiddleware: HTTP GET /Tools/NotificationsData responded 200 in 0.8ms
