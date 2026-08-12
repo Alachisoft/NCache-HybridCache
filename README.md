@@ -59,9 +59,9 @@ On top of everything `HybridCache` gives you, this package additionally keeps **
 ## 🏗️ Architecture
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph App["🖥️ Application Tier"]
-        direction TB
+        direction LR
         N1["🧠 Node 1 — L1"]
         N2["🧠 Node 2 — L1"]
         N3["🧠 Node 3 — L1"]
@@ -70,7 +70,7 @@ flowchart LR
     PS(("📡 Pub/Sub<br/>UPDATE · REMOVE · TAG"))
 
     subgraph Cluster["🗄️ NCache Cluster (L2)"]
-        direction TB
+        direction LR
         S1[("Server 1")]
         S2[("Server 2")]
     end
