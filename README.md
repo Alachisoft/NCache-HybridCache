@@ -1,21 +1,28 @@
 ﻿<div align="center">
 
-# ⚡ NCache.OSS.Caching.Hybrid
+# NCache.OSS.Caching.Hybrid
 
 ### An implementation of Microsoft's `HybridCache` — backed by NCache
 
-
 </div>
 
-| ⚡ TL;DR (quick version) |
-|---|
-| A is a drop-in implementation of Microsoft's `HybridCache` abstraction, powered by NCache as the L2 layer. On top of the standard L1 (in-process) + L2 (distributed) behavior, it adds **real-time synchronization between every node's L1 cache**, using NCache's built-in Pub/Sub — something the default Microsoft implementation does not do. |
+## Overview
 
-With .NET 9, Microsoft introduced [`HybridCache`](https://learn.microsoft.com/en-us/aspnet/core/performance/caching/hybrid) — an abstraction for combining an in-process (L1) cache with a distributed (L2) cache behind a single, simple API, along with a default implementation.
+`HybridCache` is a caching API introduced by Microsoft in .NET 9 that unifies in-process (L1) and distributed (L2) caching behind a single abstraction, along with a default implementation.
 
-NCache.OSS.Caching.Hybrid  is an alternative implementation of that same abstraction, using NCache as the distributed layer. Anywhere your application depends on `HybridCache`, you can register this package instead and get everything the abstraction promises — plus a few things the default implementation doesn't do.
+`NCache.OSS.Caching.Hybrid` is an implementation of the `HybridCache` abstraction that uses NCache as the distributed (L2) cache layer. It is intended as a direct replacement for the default implementation in applications that already use, or want to use, an NCache cluster.
 
-## 🖼️ Getting Started
+In addition to satisfying the standard `HybridCache` contract, this implementation uses NCache's built-in Pub/Sub messaging to keep the in-process (L1) cache synchronized across every application instance connected to the cluster. Under the default `HybridCache` implementation, L1 caches on different nodes are independent and can diverge until entries expire; this implementation propagates updates, removals, and tag invalidations to every node in real time.
+
+| | |
+|---|---|
+| **Abstraction** | `Microsoft.Extensions.Caching.Hybrid.HybridCache` |
+| **L1 layer** | NCache In-Proc cache |
+| **L2 layer** | NCache distributed cluster |
+| **Cross-node sync** | Automatic, via NCache Pub/Sub |
+| **Minimum .NET** | .NET 8 |
+
+## Getting Started
 
 Registration is a single call, and from then on your application just depends on `HybridCache` as usual:
 
@@ -45,7 +52,7 @@ Underneath, NCache is doing the work — but your code only ever talks to `Hybri
 
 ---
 
-## 🆎 Feature Comparison
+## Feature Comparison
 
 The default Microsoft implementation of `HybridCache` gives you:
 
@@ -54,7 +61,7 @@ The default Microsoft implementation of `HybridCache` gives you:
 - cache stampede protection, scoped to a single node
 - tag-based invalidation
 
-NCache.OSS.Caching.Hybrid gives you all of that, plus:
+This package gives you all of that, plus:
 
 - **real-time L1 ⇄ L2 synchronization across every node** — see below
 - cross-node `REMOVE` and wildcard (`*`) invalidation
@@ -63,17 +70,15 @@ NCache.OSS.Caching.Hybrid gives you all of that, plus:
 - structured logging via `ILogger`, with a dedicated diagnostic category
 
 
-
 ---
 
-## 📢 L1 ⇄ L2 Synchronization
+## L1 ⇄ L2 Synchronization
 
 This is the main thing this package adds on top of `HybridCache`: **every node's L1 cache stays in sync, in real time, without you doing anything extra.**
 
 ### How it works
 
-NCache clusters have a built-in Pub/Sub messaging layer. This package uses it automatically — there's no separate backplane or messaging broker to stand up and wire in yourself. As soon as you point multiple application instances at the same NCache cluster, they're synchronized.
-
+NCache.OSS.Caching.Hybrid provides its own backplane for L1 synchronization, built on top of NCache's Pub/Sub API —  that backplane keeps every node's L1 cache in sync automatically, with no separate broker to stand up or wire in yourself.
 ```mermaid
 flowchart TB
     subgraph App["🖥️ Application Tier"]
@@ -119,7 +124,7 @@ The net effect: a write, remove, or invalidation on any one node is reflected on
 
 ---
 
-## 🚀 On Top of HybridCache
+## On Top of HybridCache
 
 A few other things this implementation adds beyond the base `HybridCache` contract:
 
@@ -130,18 +135,18 @@ A few other things this implementation adds beyond the base `HybridCache` contra
 
 ---
 
-## ✨ Features
+## Features
 
 <table>
 <tr>
 <td valign="top" width="50%">
 
-### 🔀 Synchronization
+### Synchronization
 - **📡 Pub/Sub L1 Sync** — every node's local cache stays consistent automatically
 - **🔁 Cross-Node Invalidation** — `RemoveAsync`, `RemoveByTagAsync`, and wildcard `*` flushes propagate instantly
 - **🧭 Sentinel-Based Tag Tracking** — tag invalidation timestamps persisted in L2 for durability
 
-### 🚀 Performance
+### Performance
 - **🧠 L1/L2 Hybrid Caching** — blazing-fast local reads backed by distributed durability
 - **🛡️ Cache Stampede Prevention** — semaphore-based locking with `TRY/FINALLY` safety
 - **📦 Bulk Operations** — `RemoveBulk` / `GetBulk` under the hood for multi-key/tag ops
@@ -149,12 +154,12 @@ A few other things this implementation adds beyond the base `HybridCache` contra
 </td>
 <td valign="top" width="50%">
 
-### 🏷️ Flexibility
+### Flexibility
 - **🏷️ Tag-Based Invalidation** — logical deletion, no physical scan required
 - **🎚️ Configurable Cache Flags** — fine-grained control over L1/L2 read/write behavior
 - **Ⓜ️ Microsoft HybridCache Compatible** — true drop-in for `HybridCache`
 
-### 🔭 Observability
+### Observability
 - **📜 Structured Logging** — full `ILogger` integration
 - **🩺 Diagnostic Logging** — dedicated debug category for troubleshooting
 - **⏱️ Independent L1/L2 Expiration** — tune freshness vs. durability separately
@@ -165,7 +170,7 @@ A few other things this implementation adds beyond the base `HybridCache` contra
 
 ---
 
-## 📦 Package Versions
+## Package Versions
 
 | Package | Version |
 |---|---|
@@ -175,7 +180,7 @@ A few other things this implementation adds beyond the base `HybridCache` contra
 
 ---
 
-## 🚀 Installation
+## Installation
 
 ```bash
 dotnet add package NCache.OSS.Caching.Hybrid
@@ -185,7 +190,7 @@ dotnet add package NCache.OSS.Caching.Hybrid
 Install-Package NCache.OSS.Caching.Hybrid
 ```
 
-### ✅ Prerequisites
+### Prerequisites
 
 | # | Requirement |
 |---|---|
@@ -195,9 +200,9 @@ Install-Package NCache.OSS.Caching.Hybrid
 
 ---
 
-## ⚡ Quick Start
+## Quick Start
 
-### 1️⃣ Configure `appsettings.json`
+### 1. Configure `appsettings.json`
 
 ```json
 {
@@ -213,7 +218,7 @@ Install-Package NCache.OSS.Caching.Hybrid
 }
 ```
 
-### 2️⃣ Register services in `Program.cs`
+### 2. Register services in `Program.cs`
 
 <details open>
 <summary><b>Using <code>IConfiguration</code></b></summary>
@@ -249,7 +254,7 @@ builder.Services.AddNCacheHybridCache(options =>
 
 </details>
 
-### 3️⃣ Inject and use `HybridCache`
+### 3. Inject and use `HybridCache`
 
 ```csharp
 public class ProductService
@@ -272,10 +277,10 @@ public class ProductService
 
 ---
 
-## 📚 API Reference
+## API Reference
 
 <details>
-<summary><h3>🔍 <code>GetOrCreateAsync</code> — retrieve or create with L1/L2 fallback</h3></summary>
+<summary><h3><code>GetOrCreateAsync</code> — retrieve or create with L1/L2 fallback</h3></summary>
 
 ```csharp
 ValueTask<T> GetOrCreateAsync<TState, T>(
@@ -317,7 +322,7 @@ var user = await _cache.GetOrCreateAsync(
 </details>
 
 <details>
-<summary><h3>✍️ <code>SetAsync</code> — write to L1 + L2, then sync the cluster</h3></summary>
+<summary><h3><code>SetAsync</code> — write to L1 + L2, then sync the cluster</h3></summary>
 
 ```csharp
 ValueTask SetAsync<T>(
@@ -347,7 +352,7 @@ await _cache.SetAsync(
 </details>
 
 <details>
-<summary><h3>🗑️ <code>RemoveAsync</code> — single key & bulk key removal</h3></summary>
+<summary><h3><code>RemoveAsync</code> — single key & bulk key removal</h3></summary>
 
 **Single key**
 
@@ -377,7 +382,7 @@ await _cache.RemoveAsync(keysToRemove);
 </details>
 
 <details>
-<summary><h3>🏷️ <code>RemoveByTagAsync</code> — logical, timestamp-based invalidation</h3></summary>
+<summary><h3><code>RemoveByTagAsync</code> — logical, timestamp-based invalidation</h3></summary>
 
 ```csharp
 ValueTask RemoveByTagAsync(string tag, CancellationToken cancellationToken = default);
@@ -403,10 +408,10 @@ await _cache.RemoveByTagAsync("*");
 
 ---
 
-## ⚙️ Configuration Options
+## Configuration Options
 
 <details open>
-<summary><b>🔧 <code>NCacheHybridCacheConfiguration</code></b></summary>
+<summary><b><code>NCacheHybridCacheConfiguration</code></b></summary>
 
 | Property | Type | Required | Default | Description |
 |---|---|:---:|---|---|
@@ -418,7 +423,7 @@ await _cache.RemoveByTagAsync("*");
 </details>
 
 <details>
-<summary><b>🖧 <code>ServerConfig</code></b></summary>
+<summary><b><code>ServerConfig</code></b></summary>
 
 | Property | Type | Default | Description |
 |---|---|---|---|
@@ -428,7 +433,7 @@ await _cache.RemoveByTagAsync("*");
 </details>
 
 <details>
-<summary><b>🕓 <code>HybridCacheEntryOptions</code></b></summary>
+<summary><b><code>HybridCacheEntryOptions</code></b></summary>
 
 | Property | Type | Description |
 |---|---|---|
@@ -439,7 +444,7 @@ await _cache.RemoveByTagAsync("*");
 </details>
 
 <details>
-<summary><b>🎚️ <code>HybridCacheEntryFlags</code></b></summary>
+<summary><b><code>HybridCacheEntryFlags</code></b></summary>
 
 | Flag | Description |
 |---|---|
@@ -456,7 +461,7 @@ await _cache.RemoveByTagAsync("*");
 
 ---
 
-## 🧪 Best Practices
+## Best Practices
 
 <table>
 <tr>
@@ -530,7 +535,7 @@ foreach (var product in products)
 
 ---
 
-## 🛠️ Troubleshooting
+## Troubleshooting
 
 | Issue | Cause | Solution |
 |---|---|---|
@@ -556,7 +561,7 @@ foreach (var product in products)
 ```
 
 <details>
-<summary>🔩 Internal optimizations worth knowing about</summary>
+<summary>Internal optimizations worth knowing about</summary>
 
 - **`isItemInvalid` flag**: an L1 hit with invalid tags skips L2 entirely and goes straight to the factory.
 - **`TRY/FINALLY` cleanup**: semaphore locks always release, even on exceptions.
@@ -568,11 +573,11 @@ foreach (var product in products)
 
 ---
 
-## 📄 License
+## License
 
 Copyright © 2005–2026 Alachisoft. All rights reserved.
 
-## 🔗 Resources
+## Resources
 
 - 📘 [NCache Documentation](https://www.alachisoft.com/resources/docs/)
 - 🐙 [NCache Open Source](https://github.com/Alachisoft/NCache)
