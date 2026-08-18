@@ -1,13 +1,132 @@
 ﻿<div align="center">
 
-#  NCache.OSS.Caching.Hybrid
+# ⚡ NCache.OSS.Caching.Hybrid
 
+### An implementation of Microsoft's `HybridCache` — backed by NCache
 
-**Drop-in `Microsoft.Extensions.Caching.Hybrid.HybridCache` implementation, backed by NCache — with real-time L1 ⇄ L2 synchronization across every node, tag-based invalidation, and built-in stampede protection.**
-
-On top of everything `HybridCache` gives you, this package additionally keeps **every node's L1 cache synchronized in real time** via NCache Pub/Sub — writes, removes, and tag invalidations all propagate across the cluster automatically, with no stale reads and no waiting on TTL.
 
 </div>
+
+| ⚡ TL;DR (quick version) |
+|---|
+| A is a drop-in implementation of Microsoft's `HybridCache` abstraction, powered by NCache as the L2 layer. On top of the standard L1 (in-process) + L2 (distributed) behavior, it adds **real-time synchronization between every node's L1 cache**, using NCache's built-in Pub/Sub — something the default Microsoft implementation does not do. |
+
+With .NET 9, Microsoft introduced [`HybridCache`](https://learn.microsoft.com/en-us/aspnet/core/performance/caching/hybrid) — an abstraction for combining an in-process (L1) cache with a distributed (L2) cache behind a single, simple API, along with a default implementation.
+
+NCache.OSS.Caching.Hybrid  is an alternative implementation of that same abstraction, using NCache as the distributed layer. Anywhere your application depends on `HybridCache`, you can register this package instead and get everything the abstraction promises — plus a few things the default implementation doesn't do.
+
+## 🖼️ Getting Started
+
+Registration is a single call, and from then on your application just depends on `HybridCache` as usual:
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddNCacheHybridCache(builder.Configuration);
+```
+
+```csharp
+public class SomeService(HybridCache cache)
+{
+    private readonly HybridCache _cache = cache;
+
+    public async Task<Product> GetProductAsync(int productId, CancellationToken token = default)
+    {
+        return await _cache.GetOrCreateAsync(
+            $"product:{productId}",
+            async ct => await _database.GetProductAsync(productId, ct),
+            cancellationToken: token
+        );
+    }
+}
+```
+
+Underneath, NCache is doing the work — but your code only ever talks to `HybridCache`. (Full setup details are in [Installation](#-installation) and [Quick Start](#-quick-start) below.)
+
+---
+
+## 🆎 Feature Comparison
+
+The default Microsoft implementation of `HybridCache` gives you:
+
+- an L1 (in-process, memory) cache
+- an L2 (distributed) cache, via `IDistributedCache`
+- cache stampede protection, scoped to a single node
+- tag-based invalidation
+
+NCache.OSS.Caching.Hybrid gives you all of that, plus:
+
+- **real-time L1 ⇄ L2 synchronization across every node** — see below
+- cross-node `REMOVE` and wildcard (`*`) invalidation
+- bulk key / tag operations, batched into a single round-trip and a single sync message
+- fine-grained `HybridCacheEntryFlags` for per-call control over which layer is read/written
+- structured logging via `ILogger`, with a dedicated diagnostic category
+
+
+
+---
+
+## 📢 L1 ⇄ L2 Synchronization
+
+This is the main thing this package adds on top of `HybridCache`: **every node's L1 cache stays in sync, in real time, without you doing anything extra.**
+
+### How it works
+
+NCache clusters have a built-in Pub/Sub messaging layer. This package uses it automatically — there's no separate backplane or messaging broker to stand up and wire in yourself. As soon as you point multiple application instances at the same NCache cluster, they're synchronized.
+
+```mermaid
+flowchart TB
+    subgraph App["🖥️ Application Tier"]
+        direction LR
+        N1["🧠 Node 1 — L1"]
+        N2["🧠 Node 2 — L1"]
+        N3["🧠 Node 3 — L1"]
+    end
+
+    PS(("📡 Pub/Sub<br/>UPDATE · REMOVE · TAG"))
+
+    subgraph Cluster["🗄️ NCache Cluster (L2)"]
+        direction LR
+        S1[("Server 1")]
+        S2[("Server 2")]
+    end
+
+    N1 <--> PS
+    N2 <--> PS
+    N3 <--> PS
+    PS <--> Cluster
+
+    classDef app fill:#eef2f7,stroke:#4a5568,color:#1a202c,stroke-width:1.5px
+    classDef bus fill:#fff8e6,stroke:#b7791f,color:#5c3d00,stroke-width:1.5px
+    classDef cluster fill:#f0f5f0,stroke:#4a5568,color:#1a202c,stroke-width:1.5px
+    class N1,N2,N3 app
+    class PS bus
+    class S1,S2 cluster
+```
+
+Concretely, here's what triggers a sync message and what every other node does with it:
+
+| Operation | What's published | What other nodes do |
+|---|---|---|
+| `SetAsync` | `UPDATE` for the key | Refresh or invalidate their local L1 entry for that key |
+| `RemoveAsync` (single or bulk) | `REMOVE` for the key(s) | Evict the key(s) from their local L1 |
+| `RemoveByTagAsync` | `TAG` invalidation, with a timestamp | Treat any L1/L2 entry created before that timestamp as stale |
+| `RemoveByTagAsync("*")` | `WILDCARD` invalidation | Treat every entry as stale, cluster-wide |
+
+Tag invalidations don't physically delete anything — a timestamp is persisted in L2 (as a sentinel key) and broadcast to every node. On the next read, any entry created before that timestamp is treated as invalid and re-fetched, regardless of which node originally cached it. This means tag invalidation is both instant across the cluster and durable, since the sentinel lives in L2, not just in memory on one node.
+
+The net effect: a write, remove, or invalidation on any one node is reflected on every other node within the cluster in real time — you don't write any additional code for this, and there's no separate component to configure. It falls out of registering the package against your NCache cluster.
+
+---
+
+## 🚀 On Top of HybridCache
+
+A few other things this implementation adds beyond the base `HybridCache` contract:
+
+- **Bulk operations** — passing multiple keys or tags to `RemoveAsync` / `RemoveByTagAsync` batches them into a single L1/L2 operation and a single Pub/Sub message, instead of one round-trip per item.
+- **Fine-grained cache flags** — `HybridCacheEntryFlags` lets you disable L1 or L2 reads/writes independently, per call, so hot-but-volatile data can skip L1 while long-lived data can skip L2.
+- **Independent expirations** — `Expiration` (L2) and `LocalCacheExpiration` (L1) are set separately, so your distributed copy can safely outlive your local copy (or vice versa).
+- **Structured, diagnosable logging** — every layer logs through `ILogger`, with a dedicated category for debug-level tracing of cache/sync behavior when you need to troubleshoot.
 
 ---
 
@@ -53,40 +172,6 @@ On top of everything `HybridCache` gives you, this package additionally keeps **
 | `NCache.OSS.Caching.Hybrid` | ![NuGet](https://img.shields.io/nuget/v/NCache.OSS.Caching.Hybrid.svg?label=&color=004880) `5.3.6.1` |
 | `Alachisoft.NCache.Opensource.SDK` | `>= 5.3.6.2` |
 | `Microsoft.Extensions.Caching.Hybrid` | `>= 10.4.0` |
-
----
-
-## 🏗️ Architecture
-
-```mermaid
-flowchart TB
-    subgraph App["🖥️ Application Tier"]
-        direction LR
-        N1["🧠 Node 1 — L1"]
-        N2["🧠 Node 2 — L1"]
-        N3["🧠 Node 3 — L1"]
-    end
-
-    PS(("📡 Pub/Sub<br/>UPDATE · REMOVE · TAG"))
-
-    subgraph Cluster["🗄️ NCache Cluster (L2)"]
-        direction LR
-        S1[("Server 1")]
-        S2[("Server 2")]
-    end
-
-    N1 <--> PS
-    N2 <--> PS
-    N3 <--> PS
-    PS <--> Cluster
-
-    classDef app fill:#eef2f7,stroke:#4a5568,color:#1a202c,stroke-width:1.5px
-    classDef bus fill:#fff8e6,stroke:#b7791f,color:#5c3d00,stroke-width:1.5px
-    classDef cluster fill:#f0f5f0,stroke:#4a5568,color:#1a202c,stroke-width:1.5px
-    class N1,N2,N3 app
-    class PS bus
-    class S1,S2 cluster
-```
 
 ---
 
