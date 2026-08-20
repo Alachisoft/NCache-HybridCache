@@ -156,12 +156,12 @@ A few other things this implementation adds beyond the base `HybridCache` contra
 
 ## Installation
 
-**NuGet Package Manager Console**
+**.NET CLI**
 ```bash
 dotnet add package NCache.OSS.Caching.Hybrid
 ```
 
-**.NET CLI**
+**NuGet Package Manager Console**
 ```powershell
 Install-Package NCache.OSS.Caching.Hybrid
 ```
