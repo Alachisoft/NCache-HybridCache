@@ -22,33 +22,7 @@ In addition to satisfying the standard `HybridCache` contract, this implementati
 | **Cross-node sync** | Automatic, via NCache Pub/Sub |
 | **Minimum .NET** | .NET 8 |
 
-## Getting Started
 
-Registration is a single call, and from then on your application just depends on `HybridCache` as usual:
-
-```csharp
-var builder = WebApplication.CreateBuilder(args);
-
-builder.Services.AddNCacheHybridCache(builder.Configuration);
-```
-
-```csharp
-public class SomeService(HybridCache cache)
-{
-    private readonly HybridCache _cache = cache;
-
-    public async Task<Product> GetProductAsync(int productId, CancellationToken token = default)
-    {
-        return await _cache.GetOrCreateAsync(
-            $"product:{productId}",
-            async ct => await _database.GetProductAsync(productId, ct),
-            cancellationToken: token
-        );
-    }
-}
-```
-
-Underneath, NCache is doing the work — but your code only ever talks to `HybridCache`. (Full setup details are in [Installation](#-installation) and [Quick Start](#-quick-start) below.)
 
 ---
 
@@ -80,9 +54,9 @@ This is the main thing this package adds on top of `HybridCache`: **every node's
 
 NCache.OSS.Caching.Hybrid provides its own backplane for L1 synchronization, built on top of NCache's Pub/Sub API —  that backplane keeps every node's L1 cache in sync automatically, with no separate broker to stand up or wire in yourself.
 ```mermaid
-flowchart TB
+flowchart LR
     subgraph App["🖥️ Application Tier"]
-        direction LR
+        direction TB
         N1["🧠 Node 1 — L1"]
         N2["🧠 Node 2 — L1"]
         N3["🧠 Node 3 — L1"]
@@ -91,7 +65,7 @@ flowchart TB
     PS(("📡 Pub/Sub<br/>UPDATE · REMOVE · TAG"))
 
     subgraph Cluster["🗄️ NCache Cluster (L2)"]
-        direction LR
+        direction TB
         S1[("Server 1")]
         S2[("Server 2")]
     end
