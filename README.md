@@ -1,6 +1,5 @@
 # ASP.NET Core HybridCache by NCache
 
-[![NuGet](https://img.shields.io/nuget/v/NCache.OSS.Caching.Hybrid?label=NuGet)](https://www.nuget.org/packages/NCache.OSS.Caching.Hybrid)
 [![NuGet downloads](https://img.shields.io/nuget/dt/NCache.OSS.Caching.Hybrid?label=Downloads)](https://www.nuget.org/packages/NCache.OSS.Caching.Hybrid)
 [![.NET](https://img.shields.io/badge/.NET-8.0%2B-512BD4)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
@@ -33,13 +32,13 @@ Use the same `HybridCache` API you already know. Swap in one registration call, 
 
 ---
 
-## Limitations of Microsoft HybridCache
+## Limitations of ASP.NET Core HybridCache
 
 `HybridCache` combines a fast in-process cache (L1) with a shared distributed cache (L2). Microsoft's default implementation, however, has these critical gaps when your app runs on more than one server:
 
 - **L1 cache updates do not synchronize with other clients.** If one client updates its L1 cache, the other clients are unaware of it. This includes removing a key or tag as well. Other clients' L1 caches keep serving stale data until their local entry expires.
 
-Both behaviors are documented in Microsoft's [HybridCache guidance](https://learn.microsoft.com/aspnet/core/performance/caching/hybrid).
+Both behaviors are documented in [ASP.NET Core HybridCache guidance](https://learn.microsoft.com/aspnet/core/performance/caching/hybrid).
 
 NCache implementation closes those gaps by first updating the L2 clusetred cache and then using the NCache Pub/Sub to notify all other NCache clients (app servers) of changes.
 
