@@ -13,7 +13,7 @@ Use the same `HybridCache` API you already know. Swap in one registration call, 
 
 ## Contents
 
-- [Why this exists](#why-this-exists)
+- [Why this exists](#limitations-of-microsoft-hybridcache)
 - [Key features](#key-features)
 - [How it works](#how-it-works)
 - [Choosing an integration model](#choosing-an-integration-model)
