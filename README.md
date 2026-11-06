@@ -1,561 +1,427 @@
-﻿<div align="center">
+# ASP.NET Core HybridCache by NCache
 
-# NCache.OSS.Caching.Hybrid
+[![NuGet downloads](https://img.shields.io/nuget/dt/NCache.OSS.Caching.Hybrid?label=Downloads)](https://www.nuget.org/packages/NCache.OSS.Caching.Hybrid)
+[![.NET](https://img.shields.io/badge/.NET-8.0%2B-512BD4)](https://dotnet.microsoft.com/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-### An implementation of Microsoft's `HybridCache` — backed by NCache
+A native implementation of Microsoft's [`HybridCache`](https://learn.microsoft.com/aspnet/core/performance/caching/hybrid) for ASP.NET Core and .NET 8+ apps that keeps every server's in-process (L1) cache in sync, using NCache Pub/Sub.
 
-</div>
-
-## Overview
-
-`HybridCache` is a caching API introduced by Microsoft in .NET 9 that unifies in-process (L1) and distributed (L2) caching behind a single abstraction, along with a default implementation.
-
-`NCache.OSS.Caching.Hybrid` is an implementation of the `HybridCache` abstraction that uses NCache as the distributed (L2) cache layer. It is intended as a direct replacement for the default implementation in applications that already use, or want to use, an NCache cluster.
-
-In addition to satisfying the standard `HybridCache` contract, this implementation uses NCache's built-in Pub/Sub messaging to keep the in-process (L1) cache synchronized across every application instance connected to the cluster. Under the default `HybridCache` implementation, L1 caches on different nodes are independent and can diverge until entries expire; this implementation propagates updates, removals, and tag invalidations to every node in real time.
-
-| | |
-|---|---|
-| **Abstraction** | `Microsoft.Extensions.Caching.Hybrid.HybridCache` |
-| **L1 layer** | NCache In-Proc cache |
-| **L2 layer** | NCache distributed cluster |
-| **Cross-node sync** | Automatic, via NCache Pub/Sub |
-| **Minimum .NET** | .NET 8 |
-
-
+Use the same `HybridCache` API you already know. Swap in one registration call, and cache updates and invalidations reach every app server, with no separate message broker to run.
 
 ---
 
-## Feature Comparison
+## Contents
 
-The default Microsoft implementation of `HybridCache` gives you:
-
-- an L1 (in-process, memory) cache
-- an L2 (distributed) cache, via `IDistributedCache`
-- cache stampede protection, scoped to a single node
-- tag-based invalidation
-
-This package gives you all of that, plus:
-
-- **real-time L1 ⇄ L2 synchronization across every node** — see below
-- cross-node `REMOVE` and wildcard (`*`) invalidation
-- bulk key / tag operations, batched into a single round-trip and a single sync message
-- fine-grained `HybridCacheEntryFlags` for per-call control over which layer is read/written
-- structured logging via `ILogger`, with a dedicated diagnostic category
-
+- [Why this exists](#limitations-of-microsoft-hybridcache)
+- [Key features](#key-features)
+- [How it works](#how-it-works)
+- [Choosing an integration model](#choosing-an-integration-model)
+- [NCache Open Source vs. Enterprise](#ncache-open-source-vs-enterprise)
+- [Prerequisites](#prerequisites)
+- [Getting started](#getting-started)
+- [Configuration reference](#configuration-reference)
+- [Usage examples](#usage-examples)
+- [Sample app](#sample-app)
+- [Limitations and behavior notes](#limitations-and-behavior-notes)
+- [Troubleshooting](#troubleshooting)
+- [FAQ](#faq)
+- [Resources](#resources)
+- [Support](#support)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## L1 ⇄ L2 Synchronization
+## Limitations of ASP.NET Core HybridCache
 
-This is the main thing this package adds on top of `HybridCache`: **every node's L1 cache stays in sync, in real time, without you doing anything extra.**
+`HybridCache` combines a fast in-process cache (L1) with a shared distributed cache (L2). Microsoft's default implementation, however, has these critical gaps when your app runs on more than one server:
 
-### How it works
+- **L1 cache updates do not synchronize with other clients.** If one client updates its L1 cache, the other clients are unaware of it. This includes removing a key or tag as well. Other clients' L1 caches keep serving stale data until their local entry expires.
 
-NCache.OSS.Caching.Hybrid provides its own backplane for L1 synchronization, built on top of NCache's Pub/Sub API —  that backplane keeps every node's L1 cache in sync automatically, with no separate broker to stand up or wire in yourself.
-```mermaid
-flowchart LR
-    subgraph App["🖥️ Application Tier"]
-        direction TB
-        N1["🧠 Node 1 — L1"]
-        N2["🧠 Node 2 — L1"]
-        N3["🧠 Node 3 — L1"]
-    end
+Both behaviors are documented in [ASP.NET Core HybridCache guidance](https://learn.microsoft.com/aspnet/core/performance/caching/hybrid).
 
-    PS(("📡 Pub/Sub<br/>UPDATE · REMOVE · TAG"))
+NCache implementation closes those gaps by first updating the L2 clusetred cache and then using the NCache Pub/Sub to notify all other NCache clients (app servers) of changes.
 
-    subgraph Cluster["🗄️ NCache Cluster (L2)"]
-        direction TB
-        S1[("Server 1")]
-        S2[("Server 2")]
-    end
+## Key features
 
-    N1 <--> PS
-    N2 <--> PS
-    N3 <--> PS
-    PS <--> Cluster
+- **Cross-server L1 sync.** `SetAsync`, `RemoveAsync`, and `RemoveByTagAsync` are broadcast to every app server through NCache Pub/Sub. No separate message broker is needed.
+- **Cluster-wide tag invalidation.** `RemoveByTagAsync` (including the `"*"` wildcard) applies on every server and survives restarts, because invalidation timestamps are stored in L2.
+- **Bulk operations.** Removing many keys or tags is sent as one L1/L2 operation and one Pub/Sub message.
+- **Stampede protection.** Concurrent requests for the same missing key on a node share a single factory call.
+- **Per-call control.** Full support for `HybridCacheEntryFlags` to skip L1 or L2 reads or writes on a given call.
+- **Drop-in replacement.** Your code keeps using the standard `HybridCache` API. Only the registration changes.
 
-    classDef app fill:#eef2f7,stroke:#4a5568,color:#1a202c,stroke-width:1.5px
-    classDef bus fill:#fff8e6,stroke:#b7791f,color:#5c3d00,stroke-width:1.5px
-    classDef cluster fill:#f0f5f0,stroke:#4a5568,color:#1a202c,stroke-width:1.5px
-    class N1,N2,N3 app
-    class PS bus
-    class S1,S2 cluster
-```
+## How it works
 
-Concretely, here's what triggers a sync message and what every other node does with it:
+![ASP.NET Core HybridCache by NCache: architecture](images/ncache-hybridcache-architecture.svg)
 
-| Operation | What's published | What other nodes do |
+**Read path.** `GetOrCreateAsync` checks L1, then L2. On a miss in both, your factory loads the data, and the result is stored in L2 and L1.
+
+**Write path.** Writes go to L2, then a message is published to NCache Pub/Sub, then L1 is updated. Every other app server receives the message and updates its own L1.
+
+| Operation | Message published | What other app servers do |
 |---|---|---|
-| `SetAsync` | `UPDATE` for the key | Refresh or invalidate their local L1 entry for that key |
-| `RemoveAsync` (single or bulk) | `REMOVE` for the key(s) | Evict the key(s) from their local L1 |
-| `RemoveByTagAsync` | `TAG` invalidation, with a timestamp | Treat any L1/L2 entry created before that timestamp as stale |
-| `RemoveByTagAsync("*")` | `WILDCARD` invalidation | Treat every entry as stale, cluster-wide |
+| `SetAsync` | `UPDATE` | Refresh the key in L1 |
+| `RemoveAsync` (single or bulk) | `REMOVE` | Evict the key(s) from L1 |
+| `RemoveByTagAsync(tag)` | `TAG` | Treat L1 entries with that tag created before the invalidation as stale |
+| `RemoveByTagAsync("*")` | `WILDCARD` | Treat all L1 entries created before the invalidation as stale |
 
-Tag invalidations don't physically delete anything — a timestamp is persisted in L2 (as a sentinel key) and broadcast to every node. On the next read, any entry created before that timestamp is treated as invalid and re-fetched, regardless of which node originally cached it. This means tag invalidation is both instant across the cluster and durable, since the sentinel lives in L2, not just in memory on one node.
+<!-- TODO: confirm with engineering whether REMOVE/UPDATE refresh or evict the remote L1 entry -->
 
-The net effect: a write, remove, or invalidation on any one node is reflected on every other node within the cluster in real time — you don't write any additional code for this, and there's no separate component to configure. It falls out of registering the package against your NCache cluster.
+**Tag invalidation.** Tags are invalidated logically, not deleted. The invalidation time is stored in L2 as a sentinel key, or for the wildcard and broadcast to all servers. On the next read, any entry created before that time is treated as a miss and reloaded through the factory.
 
----
+## Choosing an integration model
 
-## On Top of HybridCache
+NCache supports `HybridCache` in two ways:
 
-A few other things this implementation adds beyond the base `HybridCache` contract:
+| | Microsoft's HybridCache + NCache as L2 | NCache HybridCache (this package) |
+|---|---|---|
+| Package | [`NCache.Microsoft.Extensions.Caching.Opensource`](https://www.nuget.org/packages/NCache.Microsoft.Extensions.Caching.Opensource) | [`NCache.OSS.Caching.Hybrid`](https://www.nuget.org/packages/NCache.OSS.Caching.Hybrid) |
+| L1 | Microsoft `MemoryCache` | NCache In-Proc local cache |
+| L2 | NCache via `IDistributedCache` | NCache distributed cache |
+| L1 sync across servers | No | Yes, through NCache Pub/Sub |
+| Tag invalidation across servers | No (local server and L2 only) | Yes |
+| Registration | `AddHybridCache()` + NCache `IDistributedCache` | `AddNCacheHybridCache()` |
 
-- **Bulk operations** — passing multiple keys or tags to `RemoveAsync` / `RemoveByTagAsync` batches them into a single L1/L2 operation and a single Pub/Sub message, instead of one round-trip per item.
-- **Fine-grained cache flags** — `HybridCacheEntryFlags` lets you disable L1 or L2 reads/writes independently, per call, so hot-but-volatile data can skip L1 while long-lived data can skip L2.
-- **Independent expirations** — `Expiration` (L2) and `LocalCacheExpiration` (L1) are set separately, so your distributed copy can safely outlive your local copy (or vice versa).
-- **Structured, diagnosable logging** — every layer logs through `ILogger`, with a dedicated category for debug-level tracing of cache/sync behavior when you need to troubleshoot.
+Choose **this package** if your app runs on more than one server and stale L1 data is a problem. Choose **NCache as L2** if you want to stay on Microsoft's implementation and only need a shared distributed tier.
 
----
+See the [NCache HybridCache documentation](https://www.alachisoft.com/resources/docs/ncache/prog-guide/hybrid-cache.html) for both models.
 
-## Features
+## NCache Open Source vs. Enterprise
 
-<table>
-<tr>
-<td valign="top" width="50%">
+This repository is the **NCache Open Source** implementation. A HybridCache implementation for [**NCache Enterprise**](https://www.alachisoft.com/ncache/) is coming soon..
 
-### Synchronization
-- **📡 Pub/Sub L1 Sync** — every node's local cache stays consistent automatically
-- **🔁 Cross-Node Invalidation** — `RemoveAsync`, `RemoveByTagAsync`, and wildcard `*` flushes propagate instantly
-- **🧭 Sentinel-Based Tag Tracking** — tag invalidation timestamps persisted in L2 for durability
+The main difference is how the L1 caches on your app servers are kept in sync:
 
-### Performance
-- **🧠 L1/L2 Hybrid Caching** — blazing-fast local reads backed by distributed durability
-- **🛡️ Cache Stampede Prevention** — semaphore-based locking with `TRY/FINALLY` safety
-- **📦 Bulk Operations** — `RemoveBulk` / `GetBulk` under the hood for multi-key/tag ops
+- **Open Source** keeps L1 caches in sync by having the implementation publish a message to NCache Pub/Sub on every change. Each app server receives the message and updates its own L1.
+- **Enterprise** uses NCache's highly optimized [**Client Cache**](https://www.alachisoft.com/ncache/ncache-architecture.html#nc-client-cache) feature as L1. Each app server's Client Cache is kept in sync with the cluster by NCache itself, so the HybridCache implementation does not need to send sync messages at all.
 
-</td>
-<td valign="top" width="50%">
+| | NCache Open Source | NCache Enterprise |
+|---|---|---|
+| L1 | NCache In-Proc cache | NCache Client Cache |
+| L2 | NCache distributed cache | NCache distributed cache |
+| How L1 caches stay in sync | Pub/Sub messages sent by the HybridCache implementation | Client Cache sync handled by NCache itself |
+| HybridCache API | Standard `HybridCache` | Standard `HybridCache` |
+| Availability | Available now: [`NCache.OSS.Caching.Hybrid`](https://www.nuget.org/packages/NCache.OSS.Caching.Hybrid) | Coming soon |
 
-### Flexibility
-- **🏷️ Tag-Based Invalidation** — logical deletion, no physical scan required
-- **🎚️ Configurable Cache Flags** — fine-grained control over L1/L2 read/write behavior
-- **Ⓜ️ Microsoft HybridCache Compatible** — true drop-in for `HybridCache`
+<!-- TODO: add Enterprise package name, docs link, and release date when available -->
 
-### Observability
-- **📜 Structured Logging** — full `ILogger` integration
-- **🩺 Diagnostic Logging** — dedicated debug category for troubleshooting
-- **⏱️ Independent L1/L2 Expiration** — tune freshness vs. durability separately
+> [!NOTE]
+> Both implementations use the same `HybridCache` API, so code written against the Open Source implementation will run on NCache Enterprise with a change of registration and configuration only.
 
-</td>
-</tr>
-</table>
+<!-- TODO: confirm the note above (same API; only registration/config changes when moving to Enterprise) -->
 
----
+## Prerequisites
 
-## Package Versions
+- **.NET 8.0 or later** (.NET 9 and .NET 10 are supported).
+- **NCache Open Source 5.3.603 or later** installed on your cache servers, with the L2 distributed cache created and running.
+- **An In-Proc L1 cache** defined in `config.ncconf`. NCache installs one named `defaultLocalCache`.
+- **Network access** from each app server to the NCache servers (default port `9800`).
 
-| Package | Version |
-|---|---|
-| `NCache.OSS.Caching.Hybrid` | ![NuGet](https://img.shields.io/nuget/v/NCache.OSS.Caching.Hybrid.svg?label=&color=004880) `5.3.6.1` |
-| `Alachisoft.NCache.Opensource.SDK` | `>= 5.3.6.2` |
-| `Microsoft.Extensions.Caching.Hybrid` | `>= 10.4.0` |
+Client machines only need the NuGet package. NCache does not have to be installed on them.
 
----
+## Getting started
 
-## Installation
+### 1. Install the package
 
-**.NET CLI**
-```bash
+```shell
 dotnet add package NCache.OSS.Caching.Hybrid
 ```
 
-**NuGet Package Manager Console**
+Or, in the Package Manager Console:
+
 ```powershell
 Install-Package NCache.OSS.Caching.Hybrid
 ```
 
-### Prerequisites
+Installing the package adds `client.ncconf` and `config.ncconf` to your project. These files are copied to your output folder.
 
-| # | Requirement |
-|---|---|
-| 1 | 🖧 A running **NCache Server** cluster |
-| 2 | 💾 An **In-Proc** cache configured for L1 |
-| 3 | 🗄️ A **Replicated** cache configured for L2 |
+### 2. Check the `.ncconf` files
 
----
+- **`client.ncconf`** lists the NCache servers and the caches your app connects to.
+- **`config.ncconf`** defines the In-Proc L1 cache.
 
-## Quick Start
+NCache reads these files from your app's folder first, then from the NCache install folder. If NCache is not installed on the app server, make sure the local `config.ncconf` defines an In-Proc cache whose name matches `LocalCacheName`.
 
-### 1. Configure `appsettings.json`
+### 3. Add configuration to `appsettings.json`
 
 ```json
 {
-  "NCacheHybridCacheConfiguration": {
-    "LocalCacheName": "myLocalCache",
-    "DistributedCacheName": "myDistributedCache",
+  "NCacheHybridCache": {
+    "LocalCacheName": "defaultLocalCache",
+    "LocalCacheExpiration": "00:05:00",
+    "DistributedCacheName": "defaultCache",
+    "DistributedCacheExpiration": "01:00:00",
     "ServerList": [
-      { "Ip": "192.168.1.100", "Port": 9800 },
-      { "Ip": "192.168.1.101", "Port": 9800 }
-    ],
-    "EnableLogs": true
+      { "Ip": "192.168.1.100", "Port": 9800 }
+    ]
   }
 }
 ```
 
-### 2. Register services in `Program.cs`
+<!-- TODO: GitHub README used section name "NCacheHybridCacheConfiguration"; NuGet README uses "NCacheHybridCache". Confirm the correct name. -->
 
-<details open>
-<summary><b>Using <code>IConfiguration</code></b></summary>
+### 4. Register the implementation in `Program.cs`
 
 ```csharp
+using NCache.OSS.Caching.Hybrid;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Option 1: Bind from configuration section
-var config = builder.Configuration.GetSection("NCacheHybridCacheConfiguration");
-builder.Services.AddNCacheHybridCache(config);
+builder.Services.AddNCacheHybridCache(
+    builder.Configuration.GetSection("NCacheHybridCache"));
 
-// Option 2: Bind directly (auto-detects section name)
-builder.Services.AddNCacheHybridCache(builder.Configuration);
+var app = builder.Build();
 ```
 
-</details>
-
-<details>
-<summary><b>Using an action delegate</b></summary>
+### 5. Use `HybridCache` in your code
 
 ```csharp
-builder.Services.AddNCacheHybridCache(options =>
+using Microsoft.Extensions.Caching.Hybrid;
+
+public class ProductService(HybridCache cache, IProductRepository repository)
 {
-    options.LocalCacheName = "myLocalCache";
-    options.DistributedCacheName = "myDistributedCache";
-    options.ServerList = new List<ServerConfig>
+    public async Task<Product> GetProductAsync(int id, CancellationToken ct = default)
     {
-        new ServerConfig { Ip = "192.168.1.100", Port = 9800 }
-    };
-    options.EnableLogs = true;
-});
-```
+        return await cache.GetOrCreateAsync(
+            $"product:{id}",
+            async cancel => await repository.GetByIdAsync(id, cancel),
+            new HybridCacheEntryOptions
+            {
+                Expiration = TimeSpan.FromMinutes(30),          // L2
+                LocalCacheExpiration = TimeSpan.FromMinutes(5)  // L1
+            },
+            tags: ["products"],
+            cancellationToken: ct);
+    }
 
-</details>
-
-### 3. Inject and use `HybridCache`
-
-```csharp
-public class ProductService
-{
-    private readonly HybridCache _cache;
-
-    public ProductService(HybridCache cache) => _cache = cache;
-
-    public async Task<Product> GetProductAsync(int productId)
+    public async Task UpdateProductAsync(Product product, CancellationToken ct = default)
     {
-        return await _cache.GetOrCreateAsync(
-            key: $"product:{productId}",
-            state: productId,
-            factory: async (id, ct) => await _database.GetProductAsync(id, ct),
-            tags: new[] { "products", $"category:{product.CategoryId}" }
-        );
+        await repository.SaveAsync(product, ct);
+
+        // Removed from L2 and from L1 on every app server
+        await cache.RemoveAsync($"product:{product.Id}", ct);
     }
 }
 ```
 
----
+That's it. Run your app on two or more servers, and an update on one server reaches the L1 cache on all of them.
 
-## API Reference
+## Configuration reference
 
-<details>
-<summary><h3><code>GetOrCreateAsync</code> — retrieve or create with L1/L2 fallback</h3></summary>
+### `NCacheHybridCache` settings
+
+| Setting | Required | Default | Description |
+|---|---|---|---|
+| `LocalCacheName` | Yes | — | Name of the NCache In-Proc cache used as L1 |
+| `LocalCacheExpiration` | No | — | Default L1 lifetime. Overridden per call by `HybridCacheEntryOptions.LocalCacheExpiration` |
+| `DistributedCacheName` | Yes | — | Name of the NCache distributed cache used as L2 |
+| `DistributedCacheExpiration` | No | — | Default L2 lifetime. Overridden per call by `HybridCacheEntryOptions.Expiration` |
+| `ServerList` | Yes | — | NCache server nodes for L2. Each entry has `Ip` and `Port` (default `9800`) |
+| `EnableLogs` | No | `false` | Turns on diagnostic logging |
+
+<!-- TODO: confirm defaults for the expiration settings and whether EnableLogs is still supported in 5.3.603 -->
+
+### Configure in code
+
+Instead of `appsettings.json`, you can set options directly:
 
 ```csharp
-ValueTask<T> GetOrCreateAsync<TState, T>(
-    string key,
-    TState state,
-    Func<TState, CancellationToken, ValueTask<T>> factory,
-    HybridCacheEntryOptions? options = null,
-    IEnumerable<string>? tags = null,
-    CancellationToken cancellationToken = default
-);
+builder.Services.AddNCacheHybridCache(options =>
+{
+    options.LocalCacheName = "defaultLocalCache";
+    options.DistributedCacheName = "defaultCache";
+    options.ServerList =
+    [
+        new ServerConfig { Ip = "192.168.1.100", Port = 9800 }
+    ];
+});
 ```
 
-| Parameter | Description |
+### Per-call options
+
+`HybridCacheEntryOptions` overrides the defaults for a single call:
+
+| Property | Description |
 |---|---|
-| `key` | Unique cache key (null/empty handled gracefully) |
-| `state` | State passed to the factory |
-| `factory` | Async function invoked on cache miss |
-| `options` | Expiration, flags |
-| `tags` | Tags for grouping/invalidation |
-| `cancellationToken` | Passed to factory and semaphore |
+| `Expiration` | L2 lifetime |
+| `LocalCacheExpiration` | L1 lifetime |
+| `Flags` | `HybridCacheEntryFlags` that change how this call uses each tier |
 
-Checks L1, then L2, and falls back to the factory on a full miss — with built-in stampede protection so concurrent callers for the same key don't all hit the factory at once.
+Supported flags:
+
+| Flag | Effect |
+|---|---|
+| `None` | Read and write both L1 and L2 (default) |
+| `DisableLocalCacheRead` / `DisableLocalCacheWrite` / `DisableLocalCache` | Skip L1 reads, writes, or both |
+| `DisableDistributedCacheRead` / `DisableDistributedCacheWrite` / `DisableDistributedCache` | Skip L2 reads, writes, or both |
+| `DisableUnderlyingData` | Do not call the factory. Return `default` on a miss |
+
+## Usage examples
+
+### Get or create with tags
+
+Tag entries so you can invalidate groups of them later, for example by tenant:
 
 ```csharp
-var user = await _cache.GetOrCreateAsync(
-    key: $"user:{userId}",
-    state: userId,
-    factory: async (id, ct) => await _userRepository.GetByIdAsync(id, ct),
-    options: new HybridCacheEntryOptions
-    {
-        Expiration = TimeSpan.FromMinutes(30),         // L2 expiration
-        LocalCacheExpiration = TimeSpan.FromMinutes(5)  // L1 expiration (shorter)
-    },
-    tags: new[] { "users", $"tenant:{tenantId}" },
-    cancellationToken: cancellationToken
-);
+var user = await cache.GetOrCreateAsync(
+    $"user:{userId}",
+    userId,
+    static async (id, ct) => await userRepository.GetByIdAsync(id, ct),
+    tags: ["users", $"tenant:{tenantId}"]);
 ```
 
-</details>
+> [!TIP]
+> The overload that takes a `state` argument and a `static` factory avoids allocating a closure. Use it on hot paths.
 
-<details>
-<summary><h3><code>SetAsync</code> — write to L1 + L2, then sync the cluster</h3></summary>
-
-```csharp
-ValueTask SetAsync<T>(
-    string key,
-    T value,
-    HybridCacheEntryOptions? options = null,
-    IEnumerable<string>? tags = null,
-    CancellationToken cancellationToken = default
-);
-```
-
-Writes to L2, publishes a Pub/Sub `UPDATE` so every other node syncs its L1, then writes L1 locally.
+### Set a value
 
 ```csharp
-await _cache.SetAsync(
-    key: $"config:{configKey}",
-    value: configValue,
-    options: new HybridCacheEntryOptions
+await cache.SetAsync(
+    "config:feature-flags",
+    flags,
+    new HybridCacheEntryOptions
     {
         Expiration = TimeSpan.FromHours(1),
         LocalCacheExpiration = TimeSpan.FromMinutes(10)
-    },
-    tags: new[] { "configuration" }
-);
+    });
 ```
 
-</details>
-
-<details>
-<summary><h3><code>RemoveAsync</code> — single key & bulk key removal</h3></summary>
-
-**Single key**
+### Remove by key
 
 ```csharp
-ValueTask RemoveAsync(string key, CancellationToken cancellationToken = default);
+// Single key
+await cache.RemoveAsync($"product:{productId}");
+
+// Many keys: one L1/L2 operation and one Pub/Sub message
+await cache.RemoveAsync(["product:1", "product:2", "product:3"]);
 ```
 
-Removes the key from L1 and L2, then publishes a `REMOVE` message so other nodes sync.
+### Invalidate by tag
 
 ```csharp
-await _cache.RemoveAsync($"product:{productId}");
+// One tag
+await cache.RemoveByTagAsync($"tenant:{tenantId}");
+
+// Many tags
+await cache.RemoveByTagAsync(["products", "users", "orders"]);
+
+// Everything, including untagged entries
+await cache.RemoveByTagAsync("*");
 ```
 
-**Bulk keys**
+> [!TIP]
+> Prefer bulk calls over loops. Removing 100 keys one at a time sends 100 Pub/Sub messages. Removing them in one call sends one.
+
+### Skip a tier for one call
 
 ```csharp
-ValueTask RemoveAsync(IEnumerable<string> keys, CancellationToken cancellationToken = default);
+// Read straight from L2, bypassing this server's L1
+var price = await cache.GetOrCreateAsync(
+    $"price:{sku}",
+    async ct => await pricing.GetAsync(sku, ct),
+    new HybridCacheEntryOptions { Flags = HybridCacheEntryFlags.DisableLocalCache });
 ```
 
-Removes multiple keys in one bulk L1/L2 operation, with a single Pub/Sub notification for the batch.
+## Sample app
 
-```csharp
-var keysToRemove = new[] { "product:1", "product:2", "product:3" };
-await _cache.RemoveAsync(keysToRemove);
+The [`HybridCachePlayground.Web`](HybridCachePlayground.Web) project shows the implementation in action.
+
+To see L1 sync across servers, run two instances on different ports:
+
+```shell
+dotnet run --project HybridCachePlayground.Web --urls http://localhost:5001
+dotnet run --project HybridCachePlayground.Web --urls http://localhost:5002
 ```
 
-</details>
+Cache an item through both instances, update or invalidate it on one, then read it from the other. The second instance returns the new value instead of its stale L1 copy.
 
-<details>
-<summary><h3><code>RemoveByTagAsync</code> — logical, timestamp-based invalidation</h3></summary>
+<!-- TODO: add the playground's actual endpoints/steps -->
 
-```csharp
-ValueTask RemoveByTagAsync(string tag, CancellationToken cancellationToken = default);
-ValueTask RemoveByTagAsync(IEnumerable<string> tags, CancellationToken cancellationToken = default);
-```
+## Limitations and behavior notes
 
-This does **not** physically delete entries — it records an invalidation timestamp per tag (persisted in L2 as a sentinel key and broadcast via Pub/Sub), so future lookups across every node treat matching entries as stale. Using `"*"` as the tag performs a global, cluster-wide invalidation.
-
-```csharp
-// Invalidate all products in a category
-await _cache.RemoveByTagAsync($"category:{categoryId}");
-
-// Bulk — single Pub/Sub notification for all tags
-await _cache.RemoveByTagAsync(new[] { "products", "users", "orders" });
-
-// Wildcard — invalidate everything
-await _cache.RemoveByTagAsync("*");
-```
-
-> 💡 Bulk tag invalidation updates multiple tag timestamps in a single L2 operation and publishes a single Pub/Sub notification — always prefer it over looping single-tag calls.
-
-</details>
-
----
-
-## Configuration Options
-
-<details open>
-<summary><b><code>NCacheHybridCacheConfiguration</code></b></summary>
-
-| Property | Type | Required | Default | Description |
-|---|---|:---:|---|---|
-| `LocalCacheName` | `string` | ✅ | – | Name of the NCache In-Proc cache (L1) |
-| `DistributedCacheName` | `string` | ✅ | – | Name of the NCache distributed cache (L2) |
-| `ServerList` | `IList<ServerConfig>` | ✅ | – | NCache L2 server nodes |
-| `EnableLogs` | `bool` | ❌ | `false` | Enable detailed logging |
-
-</details>
-
-<details>
-<summary><b><code>ServerConfig</code></b></summary>
-
-| Property | Type | Default | Description |
-|---|---|---|---|
-| `Ip` | `string` | – | NCache server IP |
-| `Port` | `int` | `9800` | NCache server port |
-
-</details>
-
-<details>
-<summary><b><code>HybridCacheEntryOptions</code></b></summary>
-
-| Property | Type | Description |
-|---|---|---|
-| `Expiration` | `TimeSpan?` | L2 entry expiration; falls back to `DefaultEntryOptions.Expiration` |
-| `LocalCacheExpiration` | `TimeSpan?` | L1 entry expiration; falls back to `LocalCacheExpiration` config |
-| `Flags` | `HybridCacheEntryFlags` | Fine-grained cache behavior |
-
-</details>
-
-<details>
-<summary><b><code>HybridCacheEntryFlags</code></b></summary>
-
-| Flag | Description |
-|---|---|
-| `None` | Default — read/write both layers |
-| `DisableLocalCacheRead` | Skip L1 reads |
-| `DisableLocalCacheWrite` | Skip L1 writes |
-| `DisableLocalCache` | Skip L1 entirely |
-| `DisableDistributedCacheRead` | Skip L2 reads |
-| `DisableDistributedCacheWrite` | Skip L2 writes |
-| `DisableDistributedCache` | Skip L2 entirely |
-| `DisableUnderlyingData` | Return `default(T)` instead of invoking factory for null/empty keys |
-
-</details>
-
----
-
-## Best Practices
-
-<table>
-<tr>
-<td valign="top" width="33%">
-
-**⏱️ Expiration tiers**
-
-```csharp
-var options = new HybridCacheEntryOptions
-{
-    // L2 = source of truth, longer
-    Expiration =
-        TimeSpan.FromHours(1),
-
-    // L1 = quick refresh, shorter
-    LocalCacheExpiration =
-        TimeSpan.FromMinutes(5)
-};
-```
-
-</td>
-<td valign="top" width="33%">
-
-**🏷️ Hierarchical tagging**
-
-```csharp
-var tags = new[]
-{
-    "entity:product",
-    $"category:{categoryId}",
-    $"tenant:{tenantId}",
-    $"product:{productId}"
-};
-```
-
-</td>
-<td valign="top" width="33%">
-
-**🎯 Selective layers**
-
-```csharp
-// Hot, rarely-changing data
-var o1 = new HybridCacheEntryOptions
-{
-    LocalCacheExpiration =
-        TimeSpan.FromMinutes(30)
-};
-
-// Frequently-changing, skip L1
-var o2 = new HybridCacheEntryOptions
-{
-    Flags = HybridCacheEntryFlags
-        .DisableLocalCache
-};
-```
-
-</td>
-</tr>
-</table>
-
-**Bulk over loop — always:**
-
-```csharp
-// ✅ One L1/L2 bulk op + one Pub/Sub message
-await _cache.RemoveAsync(products.Select(p => $"product:{p.Id}"));
-
-// ❌ N round-trips + N Pub/Sub messages
-foreach (var product in products)
-    await _cache.RemoveAsync($"product:{product.Id}");
-```
-
----
+- **Tag invalidation is logical.** Invalidated entries stay in L1 and L2 until they expire or are reloaded. They are never returned as hits.
+- **Stampede protection is per node.** Each app server runs at most one factory call per key at a time, but two servers can each run one.
+- **L1 sync depends on Pub/Sub.** If an app server cannot reach the NCache Pub/Sub topic, its L1 can fall out of sync until entries expire. Keep `LocalCacheExpiration` short for data that changes often.
+- **Serialization.** <!-- TODO: state which serializer the implementation uses and how to customize it -->
 
 ## Troubleshooting
 
-| Issue | Cause | Solution |
+| Symptom | Likely cause | What to do |
 |---|---|---|
-| 💥 `InvalidOperationException` on startup | Invalid configuration | Verify `LocalCacheName`, `DistributedCacheName`, `ServerList` |
-| ⏳ Connection timeout | Server unreachable | Check NCache server status & firewall rules |
-| 🔀 Data inconsistency across nodes | Pub/Sub not working | Verify the messaging topic exists and is reachable |
-| ❓ Unexpected null-key behavior | `DisableUnderlyingData` flag | If set → `default(T)`; otherwise factory is invoked |
-| 🕸️ Stale data after tag invalidation | Sentinel missing | Confirm `"$$sentinel$$:{tag}"` exists in L2 |
+| `InvalidOperationException` at startup | Invalid configuration | Check `LocalCacheName`, `DistributedCacheName`, and `ServerList` |
+| Connection timeout | NCache server unreachable | Check that the NCache service is running and port `9800` is open |
+| L1 cache not found | `config.ncconf` missing the In-Proc cache | Define an In-Proc cache matching `LocalCacheName` |
+| Servers return different values | Pub/Sub not reaching all servers | Confirm the messaging topic exists and every app server can reach it |
+| Stale data after tag invalidation | Sentinel key missing in L2 | Check that `$$sentinel$$:{tag}` exists in L2 |
+| Factory not called, `null` returned | `DisableUnderlyingData` flag set | Remove the flag for that call |
 
-**Enable diagnostic logging:**
+### Enable diagnostic logging
+
+Set `EnableLogs` to `true`, then raise the log level for the package's namespace:
 
 ```json
 {
   "Logging": {
     "LogLevel": {
-      "NCache.Microsoft.Extensions.Caching.Hybrid.Opensource": "Debug"
+      "NCache.OSS.Caching.Hybrid": "Debug"
     }
   },
-  "NCacheHybridCacheConfiguration": {
+  "NCacheHybridCache": {
     "EnableLogs": true
   }
 }
 ```
 
-<details>
-<summary>Internal optimizations worth knowing about</summary>
+## FAQ
 
-- **`isItemInvalid` flag**: an L1 hit with invalid tags skips L2 entirely and goes straight to the factory.
-- **`TRY/FINALLY` cleanup**: semaphore locks always release, even on exceptions.
-- **Expiration precedence**: `options.Expiration` > config default (L2); `options.LocalCacheExpiration` > config default (L1).
-- **Bulk operations**: `RemoveBulk` / `GetBulk` used automatically for multi-key/tag calls.
-- **Sentinel keys**: tag timestamps persist in L2 as `"$$sentinel$$:{tag}"` / `"$$sentinel$$:*"`.
+### Does HybridCache sync L1 across servers?
 
-</details>
+Not with Microsoft's default implementation. Removing a key or tag only affects the current server's L1 and the shared L2, so other servers keep stale L1 data until it expires. This implementation broadcasts every change through NCache Pub/Sub, so all servers stay in sync.
 
----
+### How do I invalidate HybridCache on all servers?
 
-## License
+Call `RemoveAsync` or `RemoveByTagAsync` as usual. With this implementation, the change is applied to L2 and broadcast to every app server's L1. Use `RemoveByTagAsync("*")` to invalidate everything.
 
-Copyright © 2005–2026 Alachisoft. All rights reserved.
+### Can I use NCache with Microsoft's HybridCache?
+
+Yes, in two ways. Use [`NCache.Microsoft.Extensions.Caching.Opensource`](https://www.nuget.org/packages/NCache.Microsoft.Extensions.Caching.Opensource) as the L2 behind Microsoft's implementation, or use this package to replace the implementation entirely and get L1 sync. See [Choosing an integration model](#choosing-an-integration-model).
+
+### Do I need Redis or a separate backplane for L1 sync?
+
+No. L1 sync runs on NCache's built-in Pub/Sub, on the same cluster that serves as L2. There is no extra message broker to deploy or manage.
+
+### Is there a HybridCache implementation for NCache Enterprise?
+
+Coming soon. It uses NCache's Client Cache feature as L1, which NCache keeps in sync with the cluster itself, instead of the Pub/Sub messages this Open Source implementation sends. See [NCache Open Source vs. NCache Enterprise](#ncache-open-source-vs-ncache-enterprise).
+
+### Do I need to change my application code?
+
+No. Your code keeps using `HybridCache`. Only the registration in `Program.cs` changes from `AddHybridCache()` to `AddNCacheHybridCache()`.
+
+### Does NCache need to be installed on my app servers?
+
+No. App servers only need the NuGet package and network access to the NCache servers. Make sure the `config.ncconf` in your app folder defines the In-Proc L1 cache.
 
 ## Resources
 
-- 📘 [NCache Documentation](https://www.alachisoft.com/resources/docs/)
-- 🐙 [NCache Open Source](https://github.com/Alachisoft/NCache)
-- 📗 [Microsoft HybridCache Documentation](https://learn.microsoft.com/en-us/aspnet/core/performance/caching/hybrid)
-- 🌐 [Alachisoft Website](https://www.alachisoft.com/ncache/)
+- [NCache HybridCache documentation](https://www.alachisoft.com/resources/docs/ncache/prog-guide/hybrid-cache.html)
+- [Microsoft HybridCache documentation](https://learn.microsoft.com/aspnet/core/performance/caching/hybrid)
+- [`NCache.OSS.Caching.Hybrid` on NuGet](https://www.nuget.org/packages/NCache.OSS.Caching.Hybrid)
+- [`Alachisoft.NCache.Opensource.SDK` on NuGet](https://www.nuget.org/packages/Alachisoft.NCache.Opensource.SDK)
+- [NCache Open Source on GitHub](https://github.com/Alachisoft/NCache)
+
+## Support
+
+- **Community support:** open an [issue](https://github.com/Alachisoft/NCache-HybridCache/issues) in this repository.
+- **Paid support:** available as an option for NCache Open Source from [NCache Support](https://www.alachisoft.com/support.html).
+
+<!-- TODO: confirm the support page URL -->
+
+## Contributing
+
+Contributions are welcome. Please open an issue to discuss a change before submitting a pull request.
+
+## License
+
+This project is licensed under the [Apache License 2.0](LICENSE).
