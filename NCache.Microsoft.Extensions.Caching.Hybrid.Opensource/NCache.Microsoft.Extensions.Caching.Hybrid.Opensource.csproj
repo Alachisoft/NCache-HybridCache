@@ -27,6 +27,14 @@
 		<!-- Package Icon and Readme -->
 		<PackageIcon>Icon.png</PackageIcon>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
+
+		<!-- Build Settings -->
+		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<NoWarn>$(NoWarn);CS1591</NoWarn>
+		<SignAssembly>True</SignAssembly>
+		<AssemblyOriginatorKeyFile>..\..\..\Resources\ncache.snk</AssemblyOriginatorKeyFile>
+		<AssemblyName>Alachisoft.NCache.HybridCache</AssemblyName>
 	</PropertyGroup>
 
 	<ItemGroup>
