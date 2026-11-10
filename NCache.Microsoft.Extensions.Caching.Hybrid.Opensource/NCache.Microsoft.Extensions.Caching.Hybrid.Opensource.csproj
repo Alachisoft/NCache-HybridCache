@@ -38,10 +38,10 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Alachisoft.NCache.Opensource.SDK" Version="5.3.6.2" />
-		<PackageReference Include="Microsoft.Extensions.Caching.Hybrid" Version="10.5.0" />
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.7" />
-		<PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.7" />
+		<PackageReference Include="Alachisoft.NCache.Opensource.SDK" Version="5.3.603" />
+		<PackageReference Include="Microsoft.Extensions.Caching.Hybrid" Version="10.10.0" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+		<PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.12" />
 	</ItemGroup>
 
 	<!-- Package Content Files -->
