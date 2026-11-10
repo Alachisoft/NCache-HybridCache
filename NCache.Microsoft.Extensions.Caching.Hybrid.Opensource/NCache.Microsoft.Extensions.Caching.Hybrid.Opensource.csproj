@@ -6,7 +6,9 @@
 		<Nullable>enable</Nullable>
 		<!-- NuGet Package Configuration -->
 		<PackageId>NCache.OSS.Caching.Hybrid</PackageId>
-		<Version>5.3.6.1</Version>
+		<Version>5.3.603</Version>
+		<AssemblyVersion>5.3.0</AssemblyVersion>
+		<FileVersion>5.3.603</FileVersion>
 		<Authors>Alachisoft</Authors>
 		<Company>Alachisoft</Company>
 		<Description>NCache Opensource implementation for ASP.NET Core HybridCache providing Local L1 and distributed L2 caching with tag-based invalidation and NCache backbone synchronization.</Description>
